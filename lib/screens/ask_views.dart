@@ -395,7 +395,8 @@ mixin _Filtering<T extends StatefulWidget> on State<T> {
             child: _Search(
               controller: query,
               hint: creator?.placeholder ?? 'Search',
-              focusFirst: choices.isEmpty,
+              // Nothing to tap yet, unless nothing is a fine answer.
+              focusFirst: choices.isEmpty && ask.problem != null,
               onChanged: () => setState(() {}),
               onSubmitted: onSubmitted,
             ),
@@ -411,11 +412,13 @@ mixin _Filtering<T extends StatefulWidget> on State<T> {
         SliverList.list(children: [for (final c in visible) tile(c)]),
         if (visible.isEmpty && !create)
           SliverToBoxAdapter(
-            child: EmptyNote(
-              choices.isEmpty
-                  ? 'Nothing here yet. Type a name above to add one.'
-                  : 'Nothing matches “$typed”.',
-            ),
+            child: EmptyNote(switch ((choices.isEmpty, ask.problem)) {
+              (false, _) => 'Nothing matches “$typed”.',
+              (true, null) =>
+                'Nothing here yet. Type a name above to add one, or '
+                    'continue without.',
+              (true, _) => 'Nothing here yet. Type a name above to add one.',
+            }),
           ),
       ],
     );

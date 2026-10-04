@@ -1,5 +1,6 @@
 import '../data/ledger.dart';
 import '../data/money.dart';
+import '../data/spending.dart';
 import 'ask.dart';
 
 export 'ask.dart';
@@ -37,6 +38,10 @@ abstract class CommandFlow {
 
   /// True when changing an existing record; the flow opens on its review.
   bool get editing => false;
+
+  /// When the record happened, for flows that keep a date. The review card
+  /// shows it, and tapping it picks another day.
+  DateTime? date;
 
   /// Whether the flow ends on a review card. Flows without one save straight
   /// from their last question.
@@ -153,14 +158,62 @@ class FriendFlow extends _NameFlow {
   );
 }
 
-/// Friends and bills typed into a picker are created when the flow saves, so
-/// cancelling leaves nothing behind and one undo removes everything.
+class CategoryFlow extends _NameFlow {
+  CategoryFlow(super.ledger, {this.existing}) {
+    name = TextAsk(
+      'What should the category be called?',
+      hint:
+          'Like Food, Rent or Travel. Give expenses a category to see where '
+          'your money goes.',
+      placeholder: 'Food',
+      text: existing?.name ?? '',
+      taken: (text) => text.toLowerCase() == noCategory.toLowerCase()
+          ? '“$noCategory” is for expenses without one.'
+          : Ledger.nameTaken(
+              ledger.categories.map((c) => (id: c.id, name: c.name)),
+              text,
+              except: existing?.id,
+            )
+          ? 'You already have a category called “$text”.'
+          : null,
+    );
+  }
+  final Category? existing;
+
+  /// What expenses without a category are listed under.
+  static const noCategory = 'No category';
+
+  @override
+  String get title => existing == null ? 'New category' : 'Rename category';
+
+  @override
+  String get saveLabel => existing == null ? 'Add category' : 'Save name';
+
+  @override
+  String get savedMessage => existing == null
+      ? '“${name.phrase}” added'
+      : 'Renamed to “${name.phrase}”';
+
+  @override
+  Ledger save([Ledger? onto]) => (onto ?? ledger).put(
+    category: Category(id: existing?.id ?? newId(), name: name.phrase),
+  );
+}
+
+/// Friends, bills and categories typed into a picker are created when the
+/// flow saves, so cancelling leaves nothing behind and one undo removes
+/// everything.
 mixin _Creates on CommandFlow {
   final _newFriends = <Friend>[];
   final _newBills = <Bill>[];
+  final _newCategories = <Category>[];
 
   List<Friend> get friends => [...ledger.recentFriends, ..._newFriends];
   List<Bill> get bills => [...ledger.billsInOrder, ..._newBills];
+  List<Category> get categories => [
+    ...ledger.recentCategories,
+    ..._newCategories,
+  ];
 
   late final friendCreator = Creator(
     placeholder: 'Search or add a friend',
@@ -182,7 +235,17 @@ mixin _Creates on CommandFlow {
     },
   );
 
-  /// [onto] plus the new friends and bills that [used] refers to.
+  late final categoryCreator = Creator(
+    placeholder: 'Search or add a category',
+    label: (name) => 'New category “$name”',
+    create: (name) {
+      final category = Category(id: newId(), name: name);
+      _newCategories.add(category);
+      return category.id;
+    },
+  );
+
+  /// [onto] plus the new friends, bills and categories that [used] refers to.
   Ledger withCreated(Ledger onto, bool Function(String id) used) {
     var next = onto;
     for (final friend in _newFriends.where((f) => used(f.id))) {
@@ -190,6 +253,9 @@ mixin _Creates on CommandFlow {
     }
     for (final bill in _newBills.where((b) => used(b.id))) {
       next = next.put(bill: bill);
+    }
+    for (final category in _newCategories.where((c) => used(c.id))) {
+      next = next.put(category: category);
     }
     return next;
   }
@@ -206,6 +272,17 @@ class ExpenseFlow extends CommandFlow with _Creates {
       'What was it for?',
       placeholder: 'Dinner',
       text: e?.name ?? '',
+    );
+    category = PickAsk(
+      'Which category is it?',
+      hint: 'Categories show where your money goes. Type a name to add one.',
+      choices: () => [
+        for (final c in categories) Choice(c.id, c.name),
+        const Choice('', CategoryFlow.noCategory),
+      ],
+      describe: (c) => c.id.isEmpty ? 'no category' : c.label,
+      selected: e?.categoryId ?? '',
+      creator: categoryCreator,
     );
     bill = PickAsk(
       'Which bill is it part of?',
@@ -229,14 +306,17 @@ class ExpenseFlow extends CommandFlow with _Creates {
     );
     people = MultiPickAsk(
       'Who shared it with you?',
-      hint: 'Pick everyone involved besides you.',
+      hint:
+          'Pick everyone involved besides you. Leave it empty if it was '
+          'just yours.',
       choices: () => [for (final f in friends) Choice(f.id, f.name)],
-      describe: (chosen) => 'with ${names(chosen.map((c) => c.label))}',
+      describe: (chosen) => chosen.isEmpty
+          ? 'just you'
+          : 'with ${names(chosen.map((c) => c.label))}',
       selected: e == null
           ? const []
           : {...e.parts.keys, e.payerId}.where((id) => id != me).toList(),
       creator: friendCreator,
-      emptyProblem: 'Pick at least one friend to split with.',
     );
     payer = PickAsk(
       'Who paid?',
@@ -255,12 +335,14 @@ class ExpenseFlow extends CommandFlow with _Creates {
       quantity: () => quantity.count,
       from: e,
     );
+    date = e?.date ?? DateTime.now();
     // Started from a bill's page, the bill is already known.
     if (billId != null) preset = {bill};
   }
 
   final Expense? existing;
   late final TextAsk name;
+  late final PickAsk category;
   late final PickAsk bill;
   late final AmountAsk amount;
   late final CountAsk quantity;
@@ -277,8 +359,20 @@ class ExpenseFlow extends CommandFlow with _Creates {
   @override
   String get title => editing ? 'Edit expense' : 'New expense';
 
+  /// Whether anyone shared it. An expense that was just yours has nobody
+  /// else who could have paid, and nothing to split.
+  bool get _shared => people.chosen.isNotEmpty;
+
   @override
-  List<Ask> get asks => [name, bill, amount, quantity, people, payer, split];
+  List<Ask> get asks => [
+    name,
+    category,
+    bill,
+    amount,
+    quantity,
+    people,
+    if (_shared) ...[payer, split],
+  ];
 
   @override
   String get saveLabel => editing ? 'Save changes' : 'Add expense';
@@ -287,17 +381,21 @@ class ExpenseFlow extends CommandFlow with _Creates {
   String get savedMessage =>
       editing ? '“${name.phrase}” updated' : '“${name.phrase}” added';
 
-  Expense get _expense => Expense(
-    id: existing?.id ?? newId(),
-    billId: bill.selected!,
-    name: name.phrase,
-    amount: amount.paise!,
-    quantity: quantity.count,
-    payerId: payer.selected!,
-    split: split.mode,
-    parts: split.parts!,
-    date: existing?.date ?? DateTime.now(),
-  );
+  Expense get _expense {
+    final shared = _shared;
+    return Expense(
+      id: existing?.id ?? newId(),
+      billId: bill.selected!,
+      name: name.phrase,
+      amount: amount.paise!,
+      quantity: quantity.count,
+      payerId: shared ? payer.selected! : me,
+      split: shared ? split.mode : SplitMode.equal,
+      parts: shared ? split.parts! : const {me: 1},
+      date: date!,
+      categoryId: category.selected!.isEmpty ? null : category.selected,
+    );
+  }
 
   @override
   Ledger save([Ledger? onto]) {
@@ -306,6 +404,7 @@ class ExpenseFlow extends CommandFlow with _Creates {
       onto ?? ledger,
       (id) =>
           id == expense.billId ||
+          id == expense.categoryId ||
           id == expense.payerId ||
           expense.parts.containsKey(id),
     ).put(expense: expense);
@@ -321,19 +420,21 @@ class ExpenseFlow extends CommandFlow with _Creates {
     final after = save();
     final shares = expense.shares;
     return [
-      [
-        for (final id in expense.parts.keys)
-          Line(
-            nameOf(id),
-            rupees(shares[id]!),
-            detail: switch (expense.split) {
-              SplitMode.quantity =>
-                '${expense.parts[id]} of ${expense.quantity}',
-              SplitMode.percent => '${hundredthsText(expense.parts[id]!)}%',
-              SplitMode.equal || SplitMode.exact => null,
-            },
-          ),
-      ],
+      // An expense that was just yours costs you all of it, as shown above.
+      if (!expense.personal)
+        [
+          for (final id in expense.parts.keys)
+            Line(
+              nameOf(id),
+              rupees(shares[id]!),
+              detail: switch (expense.split) {
+                SplitMode.quantity =>
+                  '${expense.parts[id]} of ${expense.quantity}',
+                SplitMode.percent => '${hundredthsText(expense.parts[id]!)}%',
+                SplitMode.equal || SplitMode.exact => null,
+              },
+            ),
+        ],
       [
         // The payer can sit out an equal split and still be owed.
         for (final id in {
@@ -352,6 +453,14 @@ class ExpenseFlow extends CommandFlow with _Creates {
               ].join(' · '),
             ),
       ],
+      if ((shares[me] ?? 0) > 0)
+        [
+          Line(
+            'Spent in ${monthName(expense.date)}',
+            rupees(Spending(after, expense.date).total),
+            detail: 'Including this',
+          ),
+        ],
     ];
   }
 
@@ -434,6 +543,7 @@ class PaymentFlow extends CommandFlow with _Creates {
       describe: (c) => c.id.isEmpty ? 'any expense' : 'for ${c.label}',
       selected: p?.expenseId ?? '',
     );
+    date = p?.date ?? DateTime.now();
     if (friendId != null) preset = {friend};
   }
 
@@ -512,7 +622,7 @@ class PaymentFlow extends CommandFlow with _Creates {
     amount: amount.paise!,
     billId: bill.selected!,
     expenseId: expense.selected!.isEmpty ? null : expense.selected,
-    date: existing?.date ?? DateTime.now(),
+    date: date!,
   );
 
   @override

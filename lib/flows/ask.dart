@@ -138,7 +138,7 @@ final class MultiPickAsk extends Ask {
     required this.describe,
     List<String> selected = const [],
     this.creator,
-    required this.emptyProblem,
+    this.emptyProblem,
   }) : selected = [...selected];
 
   final List<Choice> Function() choices;
@@ -147,7 +147,9 @@ final class MultiPickAsk extends Ask {
   /// In the order they were picked.
   final List<String> selected;
   final Creator? creator;
-  final String emptyProblem;
+
+  /// Why picking nobody won't do, or null when it's a fine answer.
+  final String? emptyProblem;
 
   List<Choice> get chosen => [
     for (final id in selected) ...choices().where((c) => c.id == id),

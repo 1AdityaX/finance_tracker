@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:finance_tracker/data/ledger.dart';
+import 'package:finance_tracker/data/spending.dart';
 import 'package:finance_tracker/data/store.dart';
 import 'package:finance_tracker/main.dart';
+import 'package:finance_tracker/screens/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,11 +21,11 @@ Future<Store> pumpApp(WidgetTester tester, [Ledger? ledger]) async {
 }
 
 extension on WidgetTester {
-  /// Taps [text], scrolling the main list to it first when needed.
-  Future<void> tapText(String text) async {
-    if (find.text(text).evaluate().isEmpty) {
+  /// Scrolls the main list until [finder] is built and on screen.
+  Future<void> reveal(Finder finder) async {
+    if (finder.evaluate().isEmpty) {
       await scrollUntilVisible(
-        find.text(text),
+        finder,
         200,
         scrollable: find
             .byWidgetPredicate(
@@ -32,8 +34,13 @@ extension on WidgetTester {
             .last,
       );
     }
-    await ensureVisible(find.text(text).last);
+    await ensureVisible(finder.last);
     await pumpAndSettle();
+  }
+
+  /// Taps [text], scrolling the main list to it first when needed.
+  Future<void> tapText(String text) async {
+    await reveal(find.text(text));
     await tap(find.text(text).last);
     await pumpAndSettle();
   }
@@ -52,7 +59,7 @@ void main() {
   ) async {
     await pumpApp(tester);
     expect(
-      find.text('Split costs with friends, one question at a time.'),
+      find.text('Track your spending and split costs, one question at a time.'),
       findsOneWidget,
     );
     await tester.tapText('Add your first expense');
@@ -69,6 +76,12 @@ void main() {
     await tester.type('Pizza');
     expect(find.text('Type a name to continue.'), findsNothing);
     await tester.next();
+
+    // Categories are the user's own: typing one offers to add it.
+    expect(find.text('Which category is it?'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Food');
+    await tester.pumpAndSettle();
+    await tester.tapText('New category “Food”');
 
     // The bill is asked even with only General, which Continue accepts;
     // typing a name offers to start a new bill.
@@ -111,12 +124,17 @@ void main() {
     expect(find.text('Rahul owes you'), findsOneWidget);
     expect(find.text('₹300'), findsWidgets);
     // The answers so far read like a sentence.
-    for (final phrase in ['Pizza', 'in General', '₹1,200', '4 units']) {
+    for (final phrase in ['Pizza', 'Food', 'in General', '₹1,200', '4 units']) {
       expect(find.widgetWithText(ActionChip, phrase), findsOneWidget);
     }
     await tester.tapText('Add expense');
 
     expect(store.ledger.expenses.single.shares.values, [90000, 30000]);
+    expect(store.ledger.categories.single.name, 'Food');
+    expect(
+      store.ledger.expenses.single.categoryId,
+      store.ledger.categories.single.id,
+    );
     expect(find.text('“Pizza” added'), findsOneWidget);
     expect(find.textContaining('Rahul owes you'), findsWidgets);
   });
@@ -129,11 +147,15 @@ void main() {
     await tester.type('Pizza');
     await tester.next();
     await tester.next();
+    await tester.next();
     await tester.type('500');
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('Which bill is it part of?'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Which category is it?'), findsOneWidget);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('Pizza'), findsWidgets);
@@ -152,6 +174,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Pizza');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     await tester.type('900');
     await tester.next();
@@ -177,6 +200,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Pizza');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     await tester.type('900');
     await tester.next();
@@ -267,6 +291,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Pizza');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     await tester.enterText(find.byType(TextField), '900');
     await tester.testTextInput.receiveAction(TextInputAction.next);
@@ -293,7 +318,8 @@ void main() {
   ) async {
     await pumpApp(tester);
     await tester.tapText('/expense');
-    expect(find.text('1 of 7'), findsOneWidget);
+    // Who paid and how to split only come in once friends share it.
+    expect(find.text('1 of 6'), findsOneWidget);
   });
 
   testWidgets('closing asks only when answers would be lost', (tester) async {
@@ -309,7 +335,7 @@ void main() {
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     await tester.tapText('Keep editing');
-    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    expect(find.text('Which category is it?'), findsOneWidget);
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     await tester.tapText('Discard');
@@ -351,6 +377,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Pizza');
     await tester.next();
+    await tester.next(); // No category.
     // Search the bill list, pick from the keyboard, land on the amount.
     await tester.tap(find.byType(TextField));
     await tester.enterText(find.byType(TextField), 'goa');
@@ -475,6 +502,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Rent');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     await tester.type('12,000');
     expect(find.text('12000'), findsOneWidget);
@@ -547,6 +575,7 @@ void main() {
     await tester.tapText('Add expense');
     await tester.type('Hotel');
     await tester.next();
+    await tester.next(); // No category.
     expect(find.text('How much did it cost?'), findsOneWidget);
     expect(find.widgetWithText(ActionChip, 'in Goa trip'), findsOneWidget);
     await tester.type('3000');
@@ -626,6 +655,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('Pizza');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     tester.view.viewInsets = const FakeViewPadding(bottom: 200);
     await tester.pumpAndSettle();
@@ -644,6 +674,7 @@ void main() {
     await tester.tapText('/expense');
     await tester.type('A long expense name');
     await tester.next();
+    await tester.next(); // No category.
     await tester.next();
     await tester.type('1200');
     await tester.next();
@@ -655,5 +686,167 @@ void main() {
     await tester.next();
     expect(find.textContaining('still to assign'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an expense that was just yours skips who paid and the split', (
+    tester,
+  ) async {
+    final store = await pumpApp(tester, ledgerWith());
+    await tester.tapText('/expense');
+    await tester.type('Coffee');
+    await tester.next();
+    await tester.tapText('Travel'); // Picking moves on by itself.
+    await tester.next();
+    await tester.type('150');
+    await tester.next();
+    await tester.next();
+    expect(find.text('Who shared it with you?'), findsOneWidget);
+    await tester.next();
+
+    expect(find.text('Look right?'), findsOneWidget);
+    expect(find.widgetWithText(ActionChip, 'just you'), findsOneWidget);
+    expect(find.textContaining('owes'), findsNothing);
+    expect(find.textContaining('Spent in '), findsOneWidget);
+    await tester.tapText('Add expense');
+    final saved = store.ledger.expenses.single;
+    expect(saved.personal, isTrue);
+    expect(saved.categoryId, 'travel');
+  });
+
+  testWidgets('personal spending alone moves past the welcome', (tester) async {
+    await pumpApp(tester, Ledger.empty.put(expense: expense(parts: {me: 1})));
+    expect(find.text('Add your first expense'), findsNothing);
+    expect(find.text('Spent in ${monthName(DateTime.now())}'), findsOneWidget);
+  });
+
+  testWidgets('the review’s date can be moved to another day', (tester) async {
+    final store = await pumpApp(tester, ledgerWith(expenses: [expense()]));
+    await tester.tapText('Dinner');
+    await tester.tapText('Change');
+    await tester.tap(find.byTooltip('Switch to input'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '01/15/2025');
+    await tester.tapText('OK');
+    expect(find.text(shortDate(DateTime(2025, 1, 15))), findsOneWidget);
+    await tester.tapText('Save changes');
+    expect(store.ledger.expenses.single.date, DateTime(2025, 1, 15));
+  });
+
+  testWidgets('spending shows the month by category and narrows the list', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final thisMonth = DateTime(now.year, now.month);
+    final lastMonth = DateTime(now.year, now.month - 1);
+    await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [
+          expense(
+            name: 'Train',
+            amount: 50000,
+            parts: {me: 1},
+            categoryId: 'travel',
+            date: thisMonth,
+          ),
+          expense(
+            id: 'e2',
+            name: 'Flat',
+            amount: 200000,
+            parts: {me: 1},
+            categoryId: 'rent',
+            date: thisMonth,
+          ),
+          // Split with Rahul: only your ₹600 is spending.
+          expense(id: 'e3', name: 'Dinner', date: thisMonth),
+          expense(
+            id: 'e4',
+            name: 'Old',
+            amount: 100000,
+            parts: {me: 1},
+            date: lastMonth,
+          ),
+        ],
+      ),
+    );
+    expect(find.text('Most on Rent'), findsOneWidget);
+    await tester.tapText('Spent in ${monthName(now)}');
+
+    final month = monthName(now);
+    expect(find.text('You’ve spent ₹3,100 so far in $month.'), findsOneWidget);
+    expect(find.text('₹2,100 more than this time last month'), findsOneWidget);
+    // Shares of the month, with no category last whatever its size.
+    for (final share in ['65%', '16%', '19%']) {
+      expect(find.text(share), findsOneWidget);
+    }
+    await tester.reveal(find.text('Dinner'));
+    expect(
+      find.text('your share of ₹1,200 · ${shortDate(thisMonth)}'),
+      findsOne,
+    );
+
+    await tester.tapText('Rent');
+    expect(find.text('Flat'), findsOneWidget);
+    expect(find.text('Train'), findsNothing);
+    await tester.tapText('Show all');
+    await tester.reveal(find.text('Train'));
+    expect(find.text('Train'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Previous month'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('You spent ₹1,000 in ${monthName(lastMonth)}.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    final next = find.widgetWithIcon(IconButton, Icons.chevron_right);
+    expect(tester.widget<IconButton>(next).onPressed, isNull);
+  });
+
+  testWidgets('/spending opens from the command bar', (tester) async {
+    await pumpApp(tester, ledgerWith());
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'spe');
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Nothing spent in ${monthName(DateTime.now())} yet.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('categories can be added, renamed and deleted', (tester) async {
+    final store = await pumpApp(
+      tester,
+      ledgerWith(expenses: [expense(categoryId: 'travel')]),
+    );
+    await tester.tapText('Spent in ${monthName(DateTime.now())}');
+    await tester.tap(find.byTooltip('Categories'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 expense'), findsOneWidget);
+
+    await tester.tapText('New category');
+    await tester.type('rent');
+    await tester.tapText('Add category');
+    expect(find.text('You already have a category called “rent”.'), findsOne);
+    await tester.type('Food');
+    await tester.tapText('Add category');
+    expect(store.ledger.categories.map((c) => c.name), contains('Food'));
+
+    await tester.tapText('Travel');
+    await tester.type('Trips');
+    await tester.tapText('Save name');
+    expect(store.ledger.category('travel')!.name, 'Trips');
+
+    await tester.tap(find.byTooltip('Delete Trips'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('“Trips” deleted. Its expense now has no category.'),
+      findsOneWidget,
+    );
+    expect(store.ledger.expenses.single.categoryId, isNull);
+    await tester.tapText('Undo');
+    expect(store.ledger.expenses.single.categoryId, 'travel');
   });
 }

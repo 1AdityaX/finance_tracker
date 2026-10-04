@@ -59,3 +59,12 @@ extension BalanceColors on ColorScheme {
     _ => onSurfaceVariant,
   };
 }
+
+extension ChartColors on ColorScheme {
+  /// The one hue for bars: Between's teal, a step brighter than [primary] so
+  /// thin marks still read as colour. Checked for lightness, chroma and
+  /// contrast against both surfaces with the dataviz palette validator.
+  Color get bar => brightness == Brightness.light
+      ? const Color(0xFF00897B)
+      : const Color(0xFF1E9E8C);
+}

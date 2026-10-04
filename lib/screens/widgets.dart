@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/ledger.dart';
 import '../data/money.dart';
+import '../data/spending.dart';
 import '../data/store.dart';
 import '../flows/flows.dart';
 import '../theme.dart';
@@ -100,16 +101,29 @@ class Avatar extends StatelessWidget {
 }
 
 class SectionHeader extends StatelessWidget {
-  const SectionHeader(this.title, {super.key});
+  const SectionHeader(this.title, {super.key, this.action});
   final String title;
+
+  /// A small button at the end of the header, such as "Show all".
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 28, 20, 4),
-    child: Semantics(
-      header: true,
-      headingLevel: 2,
-      child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+    // A button is taller than the title, so it takes some of the spacing.
+    padding: action == null
+        ? const EdgeInsets.fromLTRB(20, 28, 20, 4)
+        : const EdgeInsets.fromLTRB(20, 20, 8, 0),
+    child: Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            header: true,
+            headingLevel: 2,
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ),
+        ),
+        ?action,
+      ],
     ),
   );
 }
@@ -194,13 +208,20 @@ class ActivityList extends StatelessWidget {
     ]..sort((a, b) => b.date.compareTo(a.date));
     final ledger = store.ledger;
     final bills = {for (final b in ledger.bills) b.id: b.name};
+    final categories = {for (final c in ledger.categories) c.id: c.name};
     final names = {for (final e in ledger.expenses) e.id: e.name};
     return SliverList.builder(
       itemCount: limit == null ? rows.length : rows.length.clamp(0, limit!),
       itemBuilder: (context, i) {
         final row = rows[i];
         if (row.expense case final e?) {
-          return _expenseTile(context, e, bills[e.billId], open[e.id] ?? 0);
+          return _expenseTile(
+            context,
+            e,
+            bills[e.billId],
+            categories[e.categoryId],
+            open[e.id] ?? 0,
+          );
         }
         final p = row.payment!;
         return _paymentTile(context, p, bills[p.billId], names[p.expenseId]);
@@ -208,7 +229,13 @@ class ActivityList extends StatelessWidget {
     );
   }
 
-  Widget _expenseTile(BuildContext context, Expense e, String? bill, int open) {
+  Widget _expenseTile(
+    BuildContext context,
+    Expense e,
+    String? bill,
+    String? category,
+    int open,
+  ) {
     final ledger = store.ledger;
     final effect = friendId == null ? null : e.owedBy(friendId!);
     // What friends owe you for this expense, or minus what you owe.
@@ -216,14 +243,16 @@ class ActivityList extends StatelessWidget {
         ? e.amount - (e.shares[me] ?? 0)
         : -(e.shares[me] ?? 0);
     return ListTile(
-      leading: _Badge(Icons.receipt_long_outlined),
+      leading: IconBadge(Icons.receipt_long_outlined),
       title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         [
           if (showBill) bill ?? 'General',
-          e.payerId == me
-              ? 'paid by you'
-              : 'paid by ${ledger.nameOf(e.payerId)}',
+          ?category,
+          if (!e.personal)
+            e.payerId == me
+                ? 'paid by you'
+                : 'paid by ${ledger.nameOf(e.payerId)}',
           if (friendId == null && net > 0) 'you lent ${rupees(net)}',
           if (friendId == null && net < 0) 'you borrowed ${rupees(-net)}',
           if (effect != null && effect != 0 && open != effect)
@@ -256,7 +285,7 @@ class ActivityList extends StatelessWidget {
     final name = store.ledger.nameOf(p.friendId);
     final sent = p.direction == Direction.sent;
     return ListTile(
-      leading: _Badge(sent ? Icons.north_east : Icons.south_west),
+      leading: IconBadge(sent ? Icons.north_east : Icons.south_west),
       title: Text(
         sent ? 'You sent $name' : '$name sent you',
         maxLines: 1,
@@ -279,8 +308,9 @@ class ActivityList extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge(this.icon);
+/// An icon on a soft tile, leading a row.
+class IconBadge extends StatelessWidget {
+  const IconBadge(this.icon, {super.key});
   final IconData icon;
 
   @override
@@ -315,11 +345,6 @@ class EmptyNote extends StatelessWidget {
   );
 }
 
-const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 /// "Today", "Yesterday", "3 Oct", or "3 Oct 2024" for other years.
 String shortDate(DateTime date) {
   final today = DateTime.now();
@@ -328,6 +353,6 @@ String shortDate(DateTime date) {
     return 'Yesterday';
   }
   // A non-breaking space keeps "3 Oct" together when a row wraps.
-  final label = '${date.day}\u00A0${_months[date.month - 1]}';
+  final label = '${date.day}\u00A0${monthName(date).substring(0, 3)}';
   return date.year == today.year ? label : '$label\u00A0${date.year}';
 }

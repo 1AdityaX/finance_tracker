@@ -3,20 +3,26 @@ import 'package:flutter/services.dart';
 
 import '../data/ledger.dart';
 import '../data/money.dart';
+import '../data/spending.dart';
 import '../data/store.dart';
 import '../flows/flows.dart';
 import '../theme.dart';
 import 'bill_screen.dart';
 import 'friend_screen.dart';
+import 'spending_screen.dart';
 import 'widgets.dart';
 
-/// A slash command. Choosing one starts its flow.
+/// A slash command. Choosing one starts its flow, or opens its [screen].
 class Command {
-  const Command(this.name, this.description, this.icon, this.start);
+  const Command(this.name, this.description, this.icon, this.start)
+    : screen = null;
+  const Command.screen(this.name, this.description, this.icon, this.screen)
+    : start = null;
   final String name;
   final String description;
   final IconData icon;
-  final CommandFlow Function(Ledger ledger) start;
+  final CommandFlow Function(Ledger ledger)? start;
+  final Widget Function(Store store)? screen;
 }
 
 final commands = [
@@ -49,6 +55,18 @@ final commands = [
     'Add someone you split costs with',
     Icons.person_add_alt_1_outlined,
     FriendFlow.new,
+  ),
+  Command.screen(
+    'spending',
+    'See where your money went each month',
+    Icons.insights_outlined,
+    (store) => SpendingScreen(store: store),
+  ),
+  Command(
+    'category',
+    'Add a category to sort your spending by',
+    Icons.sell_outlined,
+    CategoryFlow.new,
   ),
 ];
 
@@ -103,7 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _run(Command command) async {
     _dismiss();
-    final flow = command.start(store.ledger);
+    if (command.screen case final screen?) return _open(screen(store));
+    final flow = command.start!(store.ledger);
     final saved = await startFlow(context, store, flow);
     // A new bill is usually followed by its first expense.
     if (saved && flow is BillFlow && mounted) {
@@ -272,7 +291,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _overview() {
     final ledger = store.ledger;
     // Only a brand-new ledger, with nothing but the General bill, welcomes.
-    if (ledger.friends.isEmpty && ledger.bills.length == 1) return _welcome();
+    if (ledger.friends.isEmpty &&
+        ledger.bills.length == 1 &&
+        ledger.expenses.isEmpty &&
+        ledger.categories.isEmpty) {
+      return _welcome();
+    }
     final recent = ledger.recentFriends;
     final all = ledger.balances();
     final balances = {for (final f in recent) f.id: all[f.id] ?? 0};
@@ -290,6 +314,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: _Headline(friends: friends, balances: balances),
             ),
+            const SectionHeader('Spending'),
+            _spendingTile(ledger),
             const SectionHeader('Friends'),
             if (friends.isEmpty) const EmptyNote('Add friends with /friend.'),
             for (final friend in friends)
@@ -315,6 +341,27 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SliverPadding(padding: EdgeInsets.only(bottom: 16)),
       ],
+    );
+  }
+
+  /// This month's spending so far, and what most of it went on.
+  Widget _spendingTile(Ledger ledger) {
+    final now = DateTime.now();
+    final spending = Spending(ledger, now);
+    final rows = spending.byCategory;
+    final top = rows.isEmpty
+        ? null
+        : rows.reduce((top, row) => row.amount > top.amount ? row : top);
+    return ListTile(
+      leading: const IconBadge(Icons.insights_outlined),
+      title: Text('Spent in ${monthName(now)}'),
+      subtitle: Text(switch (top) {
+        null => 'Nothing yet',
+        (id: '', amount: _) => 'See where it went',
+        (:final id, amount: _) => 'Most on ${ledger.category(id)!.name}',
+      }),
+      trailing: TrailingAmount(rupees(spending.total)),
+      onTap: () => _open(SpendingScreen(store: store)),
     );
   }
 
@@ -344,13 +391,13 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
       children: [
         Text(
-          'Split costs with friends, one question at a time.',
+          'Track your spending and split costs, one question at a time.',
           style: theme.textTheme.headlineMedium,
         ),
         const SizedBox(height: 12),
         Text(
           'Pick a command below or type /. Between asks for each detail in '
-          'turn: what it was, how much it cost, who shared it and who paid.',
+          'turn: what it was, how much it cost, and who shared it, if anyone.',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

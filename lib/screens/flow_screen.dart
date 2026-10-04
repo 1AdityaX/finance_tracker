@@ -166,6 +166,30 @@ class _FlowScreenState extends State<FlowScreen> {
 
   void _save() => _commit(flow.save(widget.store.ledger), flow.savedMessage);
 
+  /// Picks another day for the record, keeping its time of day so records
+  /// from the same day stay in the order they were added.
+  Future<void> _pickDate() async {
+    final date = flow.date!;
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: date.isAfter(now) ? now : date,
+      firstDate: DateTime(date.year < 2000 ? date.year : 2000),
+      lastDate: now,
+    );
+    if (picked == null || !mounted || DateUtils.isSameDay(picked, date)) return;
+    setState(() {
+      flow.date = picked.copyWith(
+        hour: date.hour,
+        minute: date.minute,
+        second: date.second,
+        millisecond: date.millisecond,
+        microsecond: date.microsecond,
+      );
+      edited = true;
+    });
+  }
+
   void _delete() {
     final deleted = flow.delete(widget.store.ledger)!;
     _commit(deleted.ledger, deleted.message);
@@ -287,6 +311,7 @@ class _FlowScreenState extends State<FlowScreen> {
                           child: switch (current) {
                             null => _Review(
                               flow: flow,
+                              onPickDate: saving ? null : _pickDate,
                               strip: _AnswerStrip(
                                 answers: answered,
                                 onTap: _show,
@@ -488,8 +513,13 @@ class _AnswerStrip extends StatelessWidget {
 
 /// The record as it will be saved, with what it means for each friend.
 class _Review extends StatelessWidget {
-  const _Review({required this.flow, required this.strip});
+  const _Review({
+    required this.flow,
+    required this.onPickDate,
+    required this.strip,
+  });
   final CommandFlow flow;
+  final VoidCallback? onPickDate;
 
   /// The answers, scrolling with the record so neither hides the other.
   final Widget strip;
@@ -553,6 +583,7 @@ class _Review extends StatelessWidget {
                   fontFeatures: tabular,
                 ),
               ),
+              if (flow.date case final date?) _date(theme, date),
               for (final section in flow.review)
                 if (section.isNotEmpty) ...[
                   const Padding(
@@ -567,6 +598,45 @@ class _Review extends StatelessWidget {
       ),
     ],
   );
+
+  /// The record's day, which a tap changes.
+  Widget _date(ThemeData theme, DateTime date) {
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Semantics(
+        button: true,
+        label: 'Date: ${shortDate(date)}. Change',
+        excludeSemantics: true,
+        onTap: onPickDate,
+        child: InkWell(
+          onTap: onPickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
+              children: [
+                Icon(Icons.event_outlined, size: 20, color: scheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    shortDate(date),
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+                Text(
+                  'Change',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _line(ThemeData theme, Line line) {
     final color = theme.colorScheme.forSign(line.sign);

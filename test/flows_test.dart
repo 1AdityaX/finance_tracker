@@ -10,26 +10,86 @@ ExpenseFlow dinner(Ledger ledger) => ExpenseFlow(ledger)
   ..amount.paise = 120000
   ..people.selected.add('rahul');
 
+/// The review line that says who owes whom.
+Line owesLine(CommandFlow flow) =>
+    flow.review.expand((s) => s).singleWhere((l) => l.sign != 0);
+
 void main() {
   group('ExpenseFlow', () {
     test('asks in the owner’s order with sensible defaults', () {
       final flow = ExpenseFlow(ledgerWith());
       expect(flow.asks, [
         flow.name,
+        flow.category,
         flow.bill,
         flow.amount,
         flow.quantity,
         flow.people,
-        flow.payer,
-        flow.split,
       ]);
+      expect(flow.category.selected, '', reason: 'no category');
       expect(flow.bill.selected, generalBill);
       expect(flow.quantity.count, 1);
-      expect(flow.payer.selected, me);
-      expect(flow.split.mode, SplitMode.equal);
       expect(flow.name.problem, isNotNull);
       expect(flow.amount.problem, isNotNull);
-      expect(flow.people.problem, 'Pick at least one friend to split with.');
+      expect(flow.people.problem, isNull, reason: 'it can be just yours');
+      expect(flow.people.phrase, 'just you');
+
+      // Sharing it brings in who paid and how to split it.
+      flow.people.selected.add('rahul');
+      expect(flow.asks.skip(6), [flow.payer, flow.split]);
+      expect(flow.payer.selected, me);
+      expect(flow.split.mode, SplitMode.equal);
+    });
+
+    test('an expense that was just yours is all your spending', () {
+      final flow = ExpenseFlow(ledgerWith())
+        ..name.text = 'Coffee'
+        ..amount.paise = 15000;
+      expect(flow.asks.map((a) => a.problem), everyElement(isNull));
+      final saved = flow.save().expenses.single;
+      expect(saved.parts, {me: 1});
+      expect(saved.payerId, me);
+      expect(saved.personal, isTrue);
+      expect(saved.categoryId, isNull);
+      // Nothing to split, so the review only adds up the month.
+      final lines = flow.review.expand((s) => s).toList();
+      expect(lines.single.label, startsWith('Spent in '));
+      expect(lines.single.value, '₹150');
+    });
+
+    test('a friend who paid is dropped with the friends', () {
+      final flow = dinner(ledgerWith())..payer.selected = 'rahul';
+      flow.people.selected.clear();
+      expect(flow.save().expenses.single.payerId, me);
+    });
+
+    test('categories typed in are created only when saved and used', () {
+      final flow = dinner(ledgerWith());
+      flow.category.creator!.create('Unused');
+      flow.category.selected = flow.category.creator!.create('Food');
+      expect(flow.category.phrase, 'Food');
+      final saved = flow.save();
+      expect(saved.categories.map((c) => c.name), ['Travel', 'Rent', 'Food']);
+      expect(saved.expenses.single.categoryId, saved.categories.last.id);
+    });
+
+    test('lists recently used categories first, then by name', () {
+      final ledger = ledgerWith(expenses: [expense(categoryId: 'travel')]).put(
+        category: const Category(id: 'food', name: 'food'),
+      );
+      final flow = ExpenseFlow(ledger);
+      expect(flow.category.choices().map((c) => c.label), [
+        'Travel',
+        'food',
+        'Rent',
+        'No category',
+      ]);
+    });
+
+    test('the date can be moved and is saved', () {
+      final flow = dinner(ledgerWith())..date = DateTime(2026, 9, 3, 20);
+      expect(flow.save().expenses.single.date, DateTime(2026, 9, 3, 20));
+      expect(flow.review.last.single.label, 'Spent in September');
     });
 
     test('saves an equal split and says who owes what', () {
@@ -74,7 +134,7 @@ void main() {
       final flow = dinner(ledgerWith())
         ..payer.selected = 'rahul'
         ..split.excluded.add('rahul');
-      final owes = flow.review.last.single;
+      final owes = owesLine(flow);
       expect(owes.label, 'You owe Rahul');
       expect(owes.value, '₹1,200');
     });
@@ -169,7 +229,7 @@ void main() {
         ledgerWith(expenses: [original], payments: [paid]),
         existing: original,
       );
-      expect(flow.review.last.single.detail, startsWith('₹200 paid so far'));
+      expect(owesLine(flow).detail, startsWith('₹200 paid so far'));
       final wrongWay = payment(
         direction: Direction.sent,
         amount: 90000,
@@ -179,7 +239,7 @@ void main() {
         ledgerWith(expenses: [original], payments: [wrongWay]),
         existing: original,
       );
-      expect(other.review.last.single.detail, startsWith('Overall'));
+      expect(owesLine(other).detail, startsWith('Overall'));
     });
 
     test('editing keeps a payer who sat out an equal split', () {

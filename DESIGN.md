@@ -21,6 +21,8 @@ colors:
   surface-container-high-dark: "#272B2A"
   on-surface-variant-dark: "#BEC9C5"
   owe-amber-dark: "#F2B866"
+  chart-bar: "#00897B"
+  chart-bar-dark: "#1E9E8C"
 typography:
   display:
     fontFamily: "Roboto (Android), SF Pro (iOS)"
@@ -159,6 +161,9 @@ One saturated teal on warm off-white, with Material's teal-tinted neutrals doing
 - **Hairline** (outline-variant): dividers (1px) and chip outlines.
 - **Mint Container** (secondary-container / on-secondary-container): avatar circles with a single initial.
 
+### Chart
+- **Chart Teal** (chart-bar, chart-bar-dark): the one hue for spending bars, Between Teal a step brighter so an 8px bar still reads as colour. Validated with the dataviz palette script for lightness, chroma and contrast on both surfaces. Its track is the same hue at 14% opacity. "No category" bars use the outline neutral. Applied only through `ChartColors.bar`.
+
 ### Semantic
 - **Owe Amber** (owe-amber, owe-amber-dark): any amount you owe. Applied only through `BalanceColors.forSign`.
 - **Error Red** (error): validation messages above the Continue button. Nothing else.
@@ -177,7 +182,7 @@ One saturated teal on warm off-white, with Material's teal-tinted neutrals doing
 
 ### Hierarchy
 - **Display** (400, 36px/44px, tabular): the amount field while entering a value, the quantity stepper value, and the total on the review panel.
-- **Headline** (400, 24px/32px): each flow question, "Look right?", and the balance sentence on home, friend and bill screens. The welcome line uses headline-welcome (28px/36px).
+- **Headline** (400, 24px/32px): each flow question, "Look right?", and the sentence at the top of home, friend, bill and spending screens. The welcome line uses headline-welcome (28px/36px).
 - **Title** (400, 22px/28px): the record name on the review panel, the command slash.
 - **Title Medium** (500, 16px/24px): section headers, filled-button labels, per-person amounts.
 - **Body** (16px and 14px): list titles, review line labels, explanations, balance phrases under friends.
@@ -228,6 +233,10 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 - **Flow app bar:** a back arrow (close on the first page) and a left-aligned title, with close on the right once past the first page. The step bar sits below: one segment per question, current in primary, confirmed in primary at 40% opacity, upcoming in surface-container-highest. "n of N" or "Review" follows the segments.
 - **Home:** the wordmark in the app bar, and the command dock in the bottom slot. Ctrl/Cmd+K focuses the command field.
 
+### Spending breakdown
+- **Month bar:** "‹ October 2026 ›" pinned under the spending title; a chevron disables where there is nothing further.
+- **Bar row:** the name in body ink and the amount in Title Small tabular on one line; below, a thin bar of the row's share of the month, with the percentage in muted Label at its end so every bar ends in line. Bars are 8px tall, square at the start and rounded 4px at the end, on a track of their own hue. One hue for every bar: colour never encodes rank. Tapping a row narrows the expense list below; the selected row sits on surface-container-high, and the other bars in that breakdown fade to 35%. A breakdown with one row drops its bar, which would only say "all of it".
+
 ### Rows (signature)
 - **Friend row:** an avatar initial, the name, and the balance phrase in its balance colour.
 - **Activity row:** a 40px row badge (receipt, or a north-east or south-west arrow), the title, a subtitle of facts joined with " · ", and a TrailingAmount (Title Small, tabular, signed and coloured on a friend's screen).
@@ -244,5 +253,6 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 ### Don't:
 - **Don't** use error red for debts. It is only for validation messages.
 - **Don't** wrap lists, friends or bills in cards. The review panel is the only rounded container in the flows.
-- **Don't** add a second accent hue. Teal and the balance amber are the whole chromatic range.
+- **Don't** add a second accent hue. Teal (with its brighter chart step) and the balance amber are the whole chromatic range.
+- **Don't** colour bars by size or category. One hue; the length and the label carry the meaning.
 - **Don't** add strokes to filled inputs at rest. The border appears only on focus.

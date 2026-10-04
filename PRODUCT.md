@@ -12,11 +12,11 @@ Flutter with Material 3, shipped to Android and iOS. On iPhone it still honors i
 
 ## Users
 
-One person tracking money shared with friends: meals, trips, flatmate costs. They open the app right after paying, often standing at a counter, phone in one hand *(inferred)*. Friends never use the app and need no account.
+One person tracking their own spending and money shared with friends: groceries and rent, meals, trips, flatmate costs. They open the app right after paying, often standing at a counter, phone in one hand *(inferred)*. Friends never use the app and need no account.
 
 ## Product Purpose
 
-Record who paid for what and who owes whom, then record money sent or received until balances reach zero. Success is logging an expense in a few seconds without thinking about syntax, and always knowing each friend's balance.
+Record what was spent, who paid and who owes whom, then record money sent or received until balances reach zero. See each month where your own money went, by categories you make yourself, so you can handle it better. Success is logging an expense in a few seconds without thinking about syntax, always knowing each friend's balance, and knowing what this month has cost so far.
 
 ## Positioning
 
@@ -24,16 +24,19 @@ Private and local-first: every record stays on the device in SQLite. No accounts
 
 ## Operating Context
 
-Every action starts from a slash command (`/expense`, `/bill`, `/sent`, `/receive`, `/friend`). Once a command is chosen, the app asks one question at a time and fills in the record as the user answers. The owner rejected the previous design, which put every option on one Discord-style command line, as overwhelming.
+Every action starts from a slash command (`/expense`, `/bill`, `/sent`, `/receive`, `/friend`, `/category`, `/spending`). Once a command is chosen, the app asks one question at a time and fills in the record as the user answers. The owner rejected the previous design, which put every option on one Discord-style command line, as overwhelming.
 
 ## Capabilities and Constraints
 
 - **Bill:** a named group of expenses, such as a trip or a dinner. A built-in bill called "General" always exists and is the default.
-- **Expense:** a name, a bill, the amount paid, a quantity (default 1), the friends involved, who paid (you or one of them), and each person's share. Shares can be split equally, by quantity (only when quantity is above 1), by percentage, or by exact rupees.
+- **Expense:** a name, a category (optional), a bill, the amount paid, a quantity (default 1), the friends involved, who paid (you or one of them), each person's share, and a date (today unless changed on the review). With no friends it is just yours, and who paid and the split are not asked. Shares can be split equally, by quantity (only when quantity is above 1), by percentage, or by exact rupees.
+- **Category:** a kind of spending, named by the user. The owner asked for no preset list (October 2026). Deleting one keeps its expenses, uncategorised.
+- **Spending:** your share of each expense in a calendar month, by category and by bill, compared with the month before. Money paid for friends and payments between friends are not spending.
 - **Sent / received payments:** an amount, a friend, a bill (General by default, searchable) and an expense in that bill (searchable). Sent money reduces what you owe them. Received money reduces what they owe you.
 - Money is stored as integer paise (INR). Splits always add up exactly to the total.
 - Records can be corrected or deleted, and every change can be undone *(inferred: carried over from the previous app)*.
 - Records saved by the previous version on a device must survive the update *(inferred)*.
+- Budgets are a possible later addition, not built.
 
 ## Brand Commitments
 

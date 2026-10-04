@@ -1,6 +1,6 @@
 # Between
 
-A private, local-first Flutter app for tracking shared expenses and what's owed between you and your friends. Every record stays in a SQLite database on the device: no accounts, cloud sync, bank connections, or messages sent for you.
+A private, local-first Flutter app for tracking what you spend, on your own or shared with friends, and what's owed between you. Every record stays in a SQLite database on the device: no accounts, cloud sync, bank connections, or messages sent for you.
 
 Target platforms: Android and iOS.
 
@@ -10,22 +10,36 @@ Every action starts from a slash command. Tap one of the shortcuts above the com
 
 | Command | Questions, in order |
 | --- | --- |
-| `/expense` | What was it for? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
+| `/expense` | What was it for? · Which category? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
 | `/sent` | How much? · To whom? · Which bill? · Which expense? |
 | `/receive` | How much? · From whom? · Which bill? · Which expense? |
 | `/bill` | What's it called? |
 | `/friend` | What's their name? |
+| `/category` | What's it called? |
+| `/spending` | Opens where your money went, month by month |
 | `/undo` | Reverts the last change |
 
-- **Defaults are filled in.** The bill starts as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expense as "not for a particular expense". Accepting a default is one tap.
-- **Questions that don't apply are skipped.** Splitting by quantity appears only when there is more than one unit. Started from a bill's or friend's page, that answer is filled in and skipped, but still shows as a chip.
+- **Defaults are filled in.** The category starts as none, the bill as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expense as "not for a particular expense". Accepting a default is one tap.
+- **Questions that don't apply are skipped.** An expense nobody shared is just yours, so who paid and how to split it are only asked once you pick a friend. Splitting by quantity appears only when there is more than one unit. Started from a bill's or friend's page, that answer is filled in and skipped, but still shows as a chip.
 - **Answers so far show as chips** at the top of every page, for example `Pizza · in Goa trip · ₹1,200 · 4 units`. Tap one to change it; the flow then returns to the first question that needs another look, or straight to the review.
 - **Back goes to the previous page**, including the system back gesture, and keeps every answer. Closing a flow asks first only if answers would be lost.
-- **A review card** shows each person's share and who will owe whom before you save.
+- **A review card** shows each person's share, who will owe whom, and your spending for the month before you save. Its date is today; tap it to pick another day.
 - **Every save can be undone** from the snackbar, or later with `/undo`.
-- **New friends and bills can be added from a picker** by typing a name. They are saved together with the record, so cancelling leaves nothing behind.
+- **New friends, bills and categories can be added from a picker** by typing a name. They are saved together with the record, so cancelling leaves nothing behind.
 
 Tap any expense or payment to open it on its review card. Tap an answer to edit it, or use the bin icon to delete the record. A friend's page records money sent or received with the friend filled in, and a bill's page adds expenses to that bill.
+
+## Spending
+
+`/spending`, or the "Spent in" row on the home screen, shows one month at a time:
+
+- What you spent, and how it compares with the month before. The current month is compared with the same days of last month.
+- Your spending by category and by bill, as bars of each one's share. Expenses without a category are grouped last, under "No category".
+- Every expense with your share in it, biggest first. Tap a category or bill to narrow the list; tap an expense to edit it.
+
+Spending is your share of each expense: all of an expense that was just yours, your part of a split one. Money you paid for friends isn't spending, it's what they owe you, and payments between you never count.
+
+Categories are your own; there is no preset list. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed and deleted. Deleting a category keeps its expenses, without a category.
 
 ## Getting started
 
@@ -41,20 +55,23 @@ flutter run
 ```
 lib/
   main.dart              App entry, loading and load-error screens
-  theme.dart             Material 3 theme (light and dark) and balance colours
+  theme.dart             Material 3 theme (light and dark), balance and chart colours
   data/
     money.dart           Paise formatting, parsing, and exact apportioning
-    ledger.dart          Friend, Bill, Expense, Payment, and balance queries
+    ledger.dart          Friend, Bill, Category, Expense, Payment, balance queries
+    spending.dart        Your spending in a month, by category and by bill
     store.dart           Persistence (SQLite), undo, and upgrading old data
   flows/
     ask.dart             Question types: text, amount, count, pick, multi-pick, split
-    flows.dart           The command flows: expense, payment, bill, friend
+    flows.dart           The command flows: expense, payment, bill, friend, category
   screens/
     flow_screen.dart     Runs a flow: step bar, answer chips, review, saving
     ask_views.dart       The input for each question type
     home_screen.dart     Balances, bills, recent activity, and the command bar
     friend_screen.dart   One friend's balance and history
     bill_screen.dart     One bill's expenses and balances
+    spending_screen.dart A month of spending: total, comparison, bars, expenses
+    categories_screen.dart  Adding, renaming and deleting categories
     widgets.dart         Shared rows, labels, and the undo snackbar
 test/                    Unit tests for data and flows, widget tests for every flow
 ```
@@ -65,12 +82,17 @@ A flow is plain Dart with no widgets in it. It holds its questions as `Ask` obje
 
 ```dart
 @override
-List<Ask> get asks => [name, bill, amount, quantity, people, payer, split];
+List<Ask> get asks => [
+  name, category, bill, amount, quantity, people,
+  if (_shared) ...[payer, split],
+];
 ```
 
 `FlowScreen` shows the first question that is unanswered or no longer valid, so a conditional question is just an `if` in that list. Each `Ask` reports its own `problem` (or null) and a short `phrase` for its chip. A flow's `save()` turns the answers into a new `Ledger`, and `review` lists the lines for its review card. Flows are tested directly in `test/flows_test.dart`, without pumping widgets.
 
-To add a command, write a `CommandFlow` subclass and add a `Command` to the list in `home_screen.dart`.
+A flow that keeps a date sets `date`; the review card then shows it and lets the user pick another day.
+
+To add a command, write a `CommandFlow` subclass and add a `Command` to the list in `home_screen.dart`, or a `Command.screen` for one that opens a page.
 
 ## Money rules
 
@@ -86,7 +108,7 @@ To add a command, write a `CommandFlow` subclass and add a `Command` to the list
 
 The whole ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement on every change. A failed save leaves the previous state in place, and a failed load is reported without writing anything.
 
-The document carries a `version`. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
+The document carries a `version`, now 3, which added categories; version 2 data reads as is, with none. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
 
 Undo history holds the last 50 changes, in memory only.
 
