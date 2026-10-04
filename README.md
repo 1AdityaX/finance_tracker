@@ -1,3 +1,131 @@
 # Between
 
-Track what you spend and split costs with friends, one question at a time.
+A private, local-first Flutter app for tracking shared expenses and what's owed between you and your friends. Every record stays in a SQLite database on the device: no accounts, cloud sync, bank connections, or messages sent for you.
+
+Target platforms: Android and iOS.
+
+## How it works
+
+Every action starts from a slash command. Tap one of the shortcuts above the command bar, or type `/` and pick one. The app then asks one question per page and builds the record as you answer.
+
+| Command | Questions, in order |
+| --- | --- |
+| `/expense` | What was it for? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
+| `/sent` | How much? · To whom? · Which bill? · Which expense? |
+| `/receive` | How much? · From whom? · Which bill? · Which expense? |
+| `/bill` | What's it called? |
+| `/friend` | What's their name? |
+| `/undo` | Reverts the last change |
+
+- **Defaults are filled in.** The bill starts as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expense as "not for a particular expense". Accepting a default is one tap.
+- **Questions that don't apply are skipped.** Splitting by quantity appears only when there is more than one unit, and the bill question is skipped while General is the only bill. A skipped answer still shows as a chip.
+- **Answers so far show as chips** at the top of every page, for example `Pizza · in Goa trip · ₹1,200 · 4 units`. Tap one to change it; the flow then returns to the first question that needs another look, or straight to the review.
+- **Back goes to the previous page**, including the system back gesture, and keeps every answer. Closing a flow asks first only if answers would be lost.
+- **A review card** shows each person's share and who will owe whom before you save.
+- **Every save can be undone** from the snackbar, or later with `/undo`.
+- **New friends and bills can be added from a picker** by typing a name. They are saved together with the record, so cancelling leaves nothing behind.
+
+Tap any expense or payment to open it on its review card. Tap an answer to edit it, or use the bin icon to delete the record. A friend's page records money sent or received with the friend filled in, and a bill's page adds expenses to that bill.
+
+## Getting started
+
+Requirements: Flutter 3.44 (stable channel, Dart 3.12) and an Android emulator or device, or Xcode with an iOS simulator.
+
+```sh
+flutter pub get
+flutter run
+```
+
+## Project structure
+
+```
+lib/
+  main.dart              App entry, loading and load-error screens
+  theme.dart             Material 3 theme (light and dark) and balance colours
+  data/
+    money.dart           Paise formatting, parsing, and exact apportioning
+    ledger.dart          Friend, Bill, Expense, Payment, and balance queries
+    store.dart           Persistence (SQLite), undo, and upgrading old data
+  flows/
+    ask.dart             Question types: text, amount, count, pick, multi-pick, split
+    flows.dart           The command flows: expense, payment, bill, friend
+  screens/
+    flow_screen.dart     Runs a flow: step bar, answer chips, review, saving
+    ask_views.dart       The input for each question type
+    home_screen.dart     Balances, bills, recent activity, and the command bar
+    friend_screen.dart   One friend's balance and history
+    bill_screen.dart     One bill's expenses and balances
+    widgets.dart         Shared rows, labels, and the undo snackbar
+test/                    Unit tests for data and flows, widget tests for every flow
+```
+
+### Adding or changing a question
+
+A flow is plain Dart with no widgets in it. It holds its questions as `Ask` objects and lists the ones that currently apply in `asks`:
+
+```dart
+@override
+List<Ask> get asks => [name, bill, amount, quantity, people, payer, split];
+```
+
+`FlowScreen` shows the first question that is unanswered or no longer valid, so a conditional question is just an `if` in that list. Each `Ask` reports its own `problem` (or null) and a short `phrase` for its chip. A flow's `save()` turns the answers into a new `Ledger`, and `review` lists the lines for its review card. Flows are tested directly in `test/flows_test.dart`, without pumping widgets.
+
+To add a command, write a `CommandFlow` subclass and add a `Command` to the list in `home_screen.dart`.
+
+## Money rules
+
+- Money is stored as integer paise and shown with Indian digit grouping, for example ₹12,34,567.50.
+- Shares always add up to the total. Equal, quantity, and percentage splits hand out leftover paise by largest remainder, breaking ties by person id, so a split always rounds the same way.
+- Percentages are stored as basis points, so 33.33% is exact.
+- If exactly one person's share is left blank, they get whatever is left.
+- A positive balance means the friend owes you; negative means you owe them. Expenses solely between other people don't affect your balances.
+- Money received lowers what a friend owes you. Money sent lowers what you owe them. Linking a payment to an expense marks that expense as paid without counting the money twice.
+- Deleting an expense keeps its payments in the balance. Deleting a bill deletes its expenses and moves its payments to General.
+
+## Data
+
+The whole ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement on every change. A failed save leaves the previous state in place, and a failed load is reported without writing anything.
+
+The document carries a `version`. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
+
+Undo history holds the last 50 changes, in memory only.
+
+## Development
+
+```sh
+dart format lib test
+flutter analyze
+flutter test
+```
+
+`analysis_options.yaml` enables strict casts, inference and raw types, plus a few extra lints.
+
+### Manual device checks
+
+Widget tests drive a simulated keyboard, so check these by hand on a real device after changing a flow:
+
+- Moving from one typed answer to the next keeps the keyboard open.
+- On iPhone, the amount keypad has no return key; Continue stays visible above it.
+- At the largest system text size, the question, its input, and Continue are all reachable.
+- Android's back gesture steps back through the questions; on the first page it closes the flow.
+
+## Releasing
+
+**Application ID.** The app still uses the Flutter template identifiers `com.example.finance_tracker` (Android) and `com.example.financeTracker` (iOS). Choose permanent identifiers before publishing; they cannot change after release.
+
+**Android signing.** Release builds read signing credentials from `android/key.properties`, which is gitignored:
+
+```properties
+storePassword=<keystore password>
+keyPassword=<key password>
+keyAlias=upload
+storeFile=<keystore path, absolute or relative to android/app>
+```
+
+Without this file, release builds fall back to debug signing so `flutter run --release` still works locally. See [Build and release an Android app](https://docs.flutter.dev/deployment/android).
+
+**iOS signing.** Open `ios/Runner.xcworkspace` in Xcode and set your development team and bundle identifier.
+
+## Not yet implemented
+
+Receipt scanning, bank imports, budgets, notifications, and cross-device sync.
