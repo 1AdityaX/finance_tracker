@@ -8,6 +8,9 @@ const priya = Friend(id: 'priya', name: 'Priya');
 
 final goa = Bill(id: 'goa', name: 'Goa trip', created: day);
 
+const travel = Category(id: 'travel', name: 'Travel');
+const rent = Category(id: 'rent', name: 'Rent');
+
 Expense expense({
   String id = 'e1',
   String billId = generalBill,
@@ -18,6 +21,7 @@ Expense expense({
   SplitMode split = SplitMode.equal,
   Map<String, int>? parts,
   DateTime? date,
+  String? categoryId,
 }) => Expense(
   id: id,
   billId: billId,
@@ -28,6 +32,7 @@ Expense expense({
   split: split,
   parts: parts ?? {me: 1, 'rahul': 1},
   date: date ?? day,
+  categoryId: categoryId,
 );
 
 Payment payment({
@@ -47,13 +52,15 @@ Payment payment({
   date: day.add(const Duration(hours: 1)),
 );
 
-/// A ledger with Rahul and Priya, a Goa trip bill, and the given records.
+/// A ledger with Rahul and Priya, a Goa trip bill, Travel and Rent
+/// categories, and the given records.
 Ledger ledgerWith({
   List<Expense> expenses = const [],
   List<Payment> payments = const [],
 }) => Ledger(
   friends: const [rahul, priya],
   bills: [...Ledger.empty.bills, goa],
+  categories: const [travel, rent],
   expenses: expenses,
   payments: payments,
 );

@@ -112,7 +112,8 @@ class Store extends ChangeNotifier {
 Ledger decodeLedger(String source) {
   final json = (jsonDecode(source) as Map).cast<String, Object?>();
   return switch (json['version']) {
-    Ledger.version => Ledger.fromJson(json),
+    // Version 2 is the same, without categories.
+    2 || Ledger.version => Ledger.fromJson(json),
     null when json.containsKey('purchases') => _fromVersion1(json),
     _ => throw const FormatException(
       'These records were saved by a newer version of Between.',

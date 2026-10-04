@@ -41,6 +41,17 @@ class Bill {
   );
 }
 
+/// A kind of spending, like Food or Rent. Users make their own.
+class Category {
+  const Category({required this.id, required this.name});
+  final String id;
+  final String name;
+
+  Map<String, Object?> toJson() => {'id': id, 'name': name};
+  factory Category.fromJson(Map<String, Object?> json) =>
+      Category(id: json['id']! as String, name: json['name']! as String);
+}
+
 /// How an expense is divided between the people in it.
 enum SplitMode {
   /// Everyone pays the same.
@@ -78,6 +89,7 @@ class Expense {
     required this.split,
     required this.parts,
     required this.date,
+    this.categoryId,
   });
   final String id;
   final String billId;
@@ -94,6 +106,10 @@ class Expense {
   /// Everyone in the expense, mapped to their part as described by [split].
   final Map<String, int> parts;
   final DateTime date;
+  final String? categoryId;
+
+  /// Just yours: you paid and nobody shared it.
+  bool get personal => payerId == me && parts.keys.every((id) => id == me);
 
   /// What each person's part costs, in paise. Always adds up to [amount].
   late final Map<String, int> shares = sharesOf(split, amount, parts);
@@ -117,6 +133,7 @@ class Expense {
     'split': split.name,
     'parts': parts,
     'date': date.toIso8601String(),
+    'category': ?categoryId,
   };
   factory Expense.fromJson(Map<String, Object?> json) => Expense(
     id: json['id']! as String,
@@ -128,6 +145,7 @@ class Expense {
     split: SplitMode.values.byName(json['split']! as String),
     parts: (json['parts']! as Map).cast<String, int>(),
     date: DateTime.parse(json['date']! as String),
+    categoryId: json['category'] as String?,
   );
 }
 
@@ -186,6 +204,7 @@ class Ledger {
     required this.bills,
     required this.expenses,
     required this.payments,
+    this.categories = const [],
   });
 
   static final empty = Ledger(
@@ -201,11 +220,14 @@ class Ledger {
   final List<Bill> bills;
   final List<Expense> expenses;
   final List<Payment> payments;
+  final List<Category> categories;
 
   Friend? friend(String id) => friends.where((f) => f.id == id).firstOrNull;
   Bill? bill(String id) => bills.where((b) => b.id == id).firstOrNull;
   Expense? expense(String id) => expenses.where((e) => e.id == id).firstOrNull;
   Payment? payment(String id) => payments.where((p) => p.id == id).firstOrNull;
+  Category? category(String? id) =>
+      categories.where((c) => c.id == id).firstOrNull;
 
   /// "You" for the device owner, otherwise the friend's name.
   String nameOf(String personId) =>
@@ -293,15 +315,36 @@ class Ledger {
     for (final p in payments) {
       touch(p.friendId, p.date);
     }
-    return friends.toList()..sort((a, b) {
-      final (da, db) = (last[a.id], last[b.id]);
+    return _recentFirst(friends, last, (f) => (id: f.id, name: f.name));
+  }
+
+  /// Categories used most recently first, then the rest by name.
+  List<Category> get recentCategories {
+    final last = <String, DateTime>{};
+    for (final e in expenses) {
+      final id = e.categoryId;
+      if (id != null && (last[id] == null || e.date.isAfter(last[id]!))) {
+        last[id] = e.date;
+      }
+    }
+    return _recentFirst(categories, last, (c) => (id: c.id, name: c.name));
+  }
+
+  /// [items] by their date in [last], newest first, then the rest by name.
+  static List<T> _recentFirst<T>(
+    List<T> items,
+    Map<String, DateTime> last,
+    ({String id, String name}) Function(T) key,
+  ) => items.toList()
+    ..sort((a, b) {
+      final (ka, kb) = (key(a), key(b));
+      final (da, db) = (last[ka.id], last[kb.id]);
       if (da != db) {
         if (da == null || db == null) return da == null ? 1 : -1;
         return db.compareTo(da);
       }
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      return ka.name.toLowerCase().compareTo(kb.name.toLowerCase());
     });
-  }
 
   /// General first, then the newest bills.
   List<Bill> get billsInOrder => [
@@ -311,7 +354,8 @@ class Ledger {
   ];
 
   /// Whether some other record in [records] already uses [name], ignoring
-  /// case. Names identify friends and bills to the user, so they stay unique.
+  /// case. Names identify friends, bills and categories to the user, so they
+  /// stay unique.
   static bool nameTaken(
     Iterable<({String id, String name})> records,
     String name, {
@@ -329,7 +373,13 @@ class Ledger {
 
   /// Adds or replaces records by id. Payments for an expense follow it when
   /// it moves to another bill, so per-bill balances stay right.
-  Ledger put({Friend? friend, Bill? bill, Expense? expense, Payment? payment}) {
+  Ledger put({
+    Friend? friend,
+    Bill? bill,
+    Category? category,
+    Expense? expense,
+    Payment? payment,
+  }) {
     var next = _put(payments, payment, (p) => p.id);
     if (expense != null) {
       next = [
@@ -344,6 +394,7 @@ class Ledger {
       bills: _put(bills, bill, (b) => b.id),
       expenses: _put(expenses, expense, (e) => e.id),
       payments: next,
+      categories: _put(categories, category, (c) => c.id),
     );
   }
 
@@ -375,16 +426,39 @@ class Ledger {
   Ledger removePayment(String id) =>
       _copy(payments: payments.where((p) => p.id != id).toList());
 
+  /// Removes a category. Its expenses stay, with no category.
+  Ledger removeCategory(String id) => _copy(
+    categories: categories.where((c) => c.id != id).toList(),
+    expenses: [
+      for (final e in expenses)
+        e.categoryId == id
+            ? Expense(
+                id: e.id,
+                billId: e.billId,
+                name: e.name,
+                amount: e.amount,
+                quantity: e.quantity,
+                payerId: e.payerId,
+                split: e.split,
+                parts: e.parts,
+                date: e.date,
+              )
+            : e,
+    ],
+  );
+
   Ledger _copy({
     List<Friend>? friends,
     List<Bill>? bills,
     List<Expense>? expenses,
     List<Payment>? payments,
+    List<Category>? categories,
   }) => Ledger(
     friends: friends ?? this.friends,
     bills: bills ?? this.bills,
     expenses: expenses ?? this.expenses,
     payments: payments ?? this.payments,
+    categories: categories ?? this.categories,
   );
 
   static Payment _relink(
@@ -410,12 +484,14 @@ class Ledger {
         : [...items.take(index), item, ...items.skip(index + 1)];
   }
 
-  static const version = 2;
+  /// Version 3 added categories.
+  static const version = 3;
 
   Map<String, Object?> toJson() => {
     'version': version,
     'friends': [for (final f in friends) f.toJson()],
     'bills': [for (final b in bills) b.toJson()],
+    'categories': [for (final c in categories) c.toJson()],
     'expenses': [for (final e in expenses) e.toJson()],
     'payments': [for (final p in payments) p.toJson()],
   };
@@ -430,6 +506,10 @@ class Ledger {
     ],
     payments: [
       for (final p in json['payments']! as List) Payment.fromJson(_map(p)),
+    ],
+    categories: [
+      for (final c in json['categories'] as List? ?? const [])
+        Category.fromJson(_map(c)),
     ],
   );
 

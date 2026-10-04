@@ -50,6 +50,16 @@ void main() {
       expect(storage.json, '{not json');
     });
 
+    test('reads version 2 data, which had no categories', () {
+      final json = ledgerWith(expenses: [expense()]).toJson()
+        ..['version'] = 2
+        ..remove('categories');
+      final ledger = decodeLedger(jsonEncode(json));
+      expect(ledger.categories, isEmpty);
+      expect(ledger.expenses.single.categoryId, isNull);
+      expect(ledger.balance('rahul'), 60000);
+    });
+
     test('refuses data from a newer version', () {
       expect(
         () => decodeLedger(jsonEncode({'version': 99})),

@@ -204,6 +204,7 @@ void main() {
           split: SplitMode.quantity,
           quantity: 3,
           parts: {me: 1, 'rahul': 2},
+          categoryId: 'travel',
         ),
       ],
       payments: [payment(expenseId: 'e1')],
@@ -212,5 +213,25 @@ void main() {
       (jsonDecode(jsonEncode(ledger.toJson())) as Map).cast<String, Object?>(),
     );
     expect(jsonEncode(copy.toJson()), jsonEncode(ledger.toJson()));
+    expect(copy.expenses.single.categoryId, 'travel');
+    expect(copy.categories.map((c) => c.name), ['Travel', 'Rent']);
+  });
+
+  test('removing a category keeps its expenses, without a category', () {
+    final ledger = ledgerWith(
+      expenses: [
+        expense(categoryId: 'travel'),
+        expense(id: 'e2', categoryId: 'rent'),
+      ],
+    ).removeCategory('travel');
+    expect(ledger.categories.map((c) => c.id), ['rent']);
+    expect(ledger.expenses.map((e) => e.categoryId), [null, 'rent']);
+    expect(ledger.expense('e1')!.shares, {me: 60000, 'rahul': 60000});
+  });
+
+  test('an expense is personal when you paid and nobody shared it', () {
+    expect(expense(parts: {me: 1}).personal, isTrue);
+    expect(expense().personal, isFalse);
+    expect(expense(payerId: 'rahul', parts: {me: 1}).personal, isFalse);
   });
 }
