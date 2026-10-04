@@ -70,8 +70,16 @@ void main() {
     expect(find.text('Type a name to continue.'), findsNothing);
     await tester.next();
 
-    // With only the General bill there is nothing to ask, but the answer
-    // still shows, and can be changed, in the strip.
+    // The bill is asked even with only General, which Continue accepts;
+    // typing a name offers to start a new bill.
+    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Goa');
+    await tester.pumpAndSettle();
+    expect(find.text('New bill “Goa”'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pumpAndSettle();
+    await tester.next();
+
     expect(find.text('How much did it cost?'), findsOneWidget);
     expect(find.widgetWithText(ActionChip, 'in General'), findsOneWidget);
     await tester.type('1200');
@@ -285,7 +293,7 @@ void main() {
   ) async {
     await pumpApp(tester);
     await tester.tapText('/expense');
-    expect(find.text('1 of 6'), findsOneWidget);
+    expect(find.text('1 of 7'), findsOneWidget);
   });
 
   testWidgets('closing asks only when answers would be lost', (tester) async {

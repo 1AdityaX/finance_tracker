@@ -255,10 +255,8 @@ class ExpenseFlow extends CommandFlow with _Creates {
       quantity: () => quantity.count,
       from: e,
     );
-    // With only General to choose, the answer is already known.
-    if (billId != null || (e == null && ledger.bills.length == 1)) {
-      preset = {bill};
-    }
+    // Started from a bill's page, the bill is already known.
+    if (billId != null) preset = {bill};
   }
 
   final Expense? existing;
@@ -436,10 +434,7 @@ class PaymentFlow extends CommandFlow with _Creates {
       describe: (c) => c.id.isEmpty ? 'any expense' : 'for ${c.label}',
       selected: p?.expenseId ?? '',
     );
-    preset = {
-      if (friendId != null) friend,
-      if (p == null && ledger.bills.length == 1) bill,
-    };
+    if (friendId != null) preset = {friend};
   }
 
   final Direction direction;

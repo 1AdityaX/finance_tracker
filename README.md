@@ -18,7 +18,7 @@ Every action starts from a slash command. Tap one of the shortcuts above the com
 | `/undo` | Reverts the last change |
 
 - **Defaults are filled in.** The bill starts as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expense as "not for a particular expense". Accepting a default is one tap.
-- **Questions that don't apply are skipped.** Splitting by quantity appears only when there is more than one unit, and the bill question is skipped while General is the only bill. A skipped answer still shows as a chip.
+- **Questions that don't apply are skipped.** Splitting by quantity appears only when there is more than one unit. Started from a bill's or friend's page, that answer is filled in and skipped, but still shows as a chip.
 - **Answers so far show as chips** at the top of every page, for example `Pizza · in Goa trip · ₹1,200 · 4 units`. Tap one to change it; the flow then returns to the first question that needs another look, or straight to the review.
 - **Back goes to the previous page**, including the system back gesture, and keeps every answer. Closing a flow asks first only if answers would be lost.
 - **A review card** shows each person's share and who will owe whom before you save.
