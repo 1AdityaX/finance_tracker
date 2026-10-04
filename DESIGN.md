@@ -220,7 +220,7 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 - **Mode chips:** ChoiceChips in the split editor (Equally, By quantity, By percentage, By amount).
 
 ### Cards / Containers
-- **Review panel:** surface-container-low, rounded at 20px, 20px padding, no border or shadow. Shows the title, a display-size total, a hairline divider, per-person lines, another divider, then who-owes-whom lines in balance colours with "After this:" captions.
+- **Review panel:** surface-container-low, rounded at 20px, 20px padding, no border or shadow. Shows the title, a display-size total and a date row (event icon, the date, a primary "Change"; a 48dp target that opens the date picker), then sections split by hairline dividers: per-person lines (left out when the expense is just yours), who-owes-whom lines in balance colours with "After this:" captions, and "Spent in <Month>" with "Including this".
 - **Command dock:** a full-width bottom bar on surface-container-low with a top divider. It holds wrapping command chips over a filled command field with a primary "/" prefix.
 
 ### Inputs / Fields
@@ -235,7 +235,7 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 
 ### Spending breakdown
 - **Month bar:** "‹ October 2026 ›" pinned under the spending title; a chevron disables where there is nothing further.
-- **Bar row:** the name in body ink and the amount in Title Small tabular on one line; below, a thin bar of the row's share of the month, with the percentage in muted Label at its end so every bar ends in line. Bars are 8px tall, square at the start and rounded 4px at the end, on a track of their own hue. One hue for every bar: colour never encodes rank. Tapping a row narrows the expense list below; the selected row sits on surface-container-high, and the other bars in that breakdown fade to 35%. A breakdown with one row drops its bar, which would only say "all of it".
+- **Bar row:** the name in body ink and the amount in Title Small tabular on one line; below, a thin bar of the row's share of the month, with the percentage in muted Label at its end so every bar ends in line. Bars are 8px tall, square at the start and rounded 4px at the end, on a track of their own hue. One hue for every bar: colour never encodes rank. Tapping a row narrows the expense list below; the selected row sits on surface-container-high, and the other bars in that breakdown fade to 35%. A category breakdown with one named row drops its bar, which would only say "all of it"; one made only of "No category" becomes a note instead; the by-bill breakdown shows only with two or more bills. Only a row on screen narrows the list. Rows are at least 48dp tall.
 
 ### Rows (signature)
 - **Friend row:** an avatar initial, the name, and the balance phrase in its balance colour.

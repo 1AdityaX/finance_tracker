@@ -604,33 +604,40 @@ class _Review extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
+      // Its own node, so the rest of the card doesn't become a button.
       child: Semantics(
+        container: true,
         button: true,
+        enabled: onPickDate != null,
         label: 'Date: ${shortDate(date)}. Change',
         excludeSemantics: true,
         onTap: onPickDate,
-        child: InkWell(
-          onTap: onPickDate,
-          borderRadius: BorderRadius.circular(12),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Row(
-              children: [
-                Icon(Icons.event_outlined, size: 20, color: scheme.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    shortDate(date),
-                    style: theme.textTheme.bodyLarge,
+        // The ripple and focus highlight draw here, above the card's colour.
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onPickDate,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Row(
+                children: [
+                  Icon(Icons.event_outlined, size: 20, color: scheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      shortDate(date),
+                      style: theme.textTheme.bodyLarge,
+                    ),
                   ),
-                ),
-                Text(
-                  'Change',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: scheme.primary,
+                  Text(
+                    'Change',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.primary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

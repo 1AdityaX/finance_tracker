@@ -8,6 +8,9 @@ const _monthNames = [
 /// "October".
 String monthName(DateTime date) => _monthNames[date.month - 1];
 
+/// What was spent in one category or bill, by its id.
+typedef Total = ({String id, int amount});
+
 /// What you spent in one calendar month: your share of each expense dated in
 /// it, whether you split it with friends or it was just yours. Money you
 /// paid for friends isn't spending; it's what they owe you.
@@ -39,13 +42,13 @@ class Spending {
 
   /// What you spent in each category, biggest first. Expenses with no
   /// category come last, under the id ''.
-  late final List<({String id, int amount})> byCategory = _group(
+  late final List<Total> byCategory = _group(
     (e) => ledger.category(e.categoryId)?.id ?? '',
     (id) => id.isEmpty ? null : ledger.category(id)!.name,
   );
 
   /// What you spent in each bill, biggest first.
-  late final List<({String id, int amount})> byBill = _group(
+  late final List<Total> byBill = _group(
     (e) => e.billId,
     (id) => ledger.bill(id)?.name,
   );
@@ -57,7 +60,7 @@ class Spending {
 
   /// Totals by [key], biggest first, ties by name. A group with no name goes
   /// last whatever its size: it isn't one of the others.
-  List<({String id, int amount})> _group(
+  List<Total> _group(
     String Function(Expense e) key,
     String? Function(String id) name,
   ) {

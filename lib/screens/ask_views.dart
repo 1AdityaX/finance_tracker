@@ -516,7 +516,7 @@ class _MultiPickViewState extends State<_MultiPickView> with _Filtering {
     final choices = ask.choices();
     final visible = filter(choices);
     if (typed.isEmpty) {
-      if (ask.problem == null) widget.onDone();
+      widget.onDone();
     } else if (visible.length == 1) {
       if (!ask.selected.contains(visible.single.id)) {
         ask.selected.add(visible.single.id);

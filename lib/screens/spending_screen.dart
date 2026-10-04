@@ -52,13 +52,21 @@ class _SpendingScreenState extends State<SpendingScreen> {
       );
       final first = months.fold(_thisMonth, (a, b) => b.isBefore(a) ? b : a);
       final last = months.fold(_thisMonth, (a, b) => b.isAfter(a) ? b : a);
-      // A category or bill deleted since it was tapped no longer narrows.
+      // A breakdown of only "No category", or of one bill, says nothing.
+      final categories = spending.byCategory.any((r) => r.id.isNotEmpty)
+          ? spending.byCategory
+          : const <Total>[];
+      final bills = spending.byBill.length > 1
+          ? spending.byBill
+          : const <Total>[];
+      // Only a row on screen narrows the list. The choice is kept, so it
+      // applies again on a month that has that row.
       final filter = switch (this.filter) {
-        (bill: true, :final id) when ledger.bill(id) == null => null,
-        (bill: false, :final id)
-            when id.isNotEmpty && ledger.category(id) == null =>
-          null,
-        final filter => filter,
+        (bill: true, :final id) when bills.any((r) => r.id == id) =>
+          this.filter,
+        (bill: false, :final id) when categories.any((r) => r.id == id) =>
+          this.filter,
+        _ => null,
       };
       final items = [
         for (final item in spending.items)
@@ -113,10 +121,33 @@ class _SpendingScreenState extends State<SpendingScreen> {
                     ),
                   ),
                 if (spending.total > 0) ...[
-                  ..._byCategory(ledger, spending, filter),
-                  if (spending.byBill.length > 1) ...[
+                  const SectionHeader('By category'),
+                  if (categories.isEmpty)
+                    EmptyNote(
+                      ledger.categories.isEmpty
+                          ? 'Add categories with /category, or while adding '
+                                'an expense, to see what your money goes on.'
+                          : 'None of these expenses has a category yet. Tap '
+                                'one below to give it one.',
+                    ),
+                  for (final row in categories)
+                    _BarRow(
+                      key: ValueKey('category/${row.id}'),
+                      label: row.id.isEmpty
+                          ? CategoryFlow.noCategory
+                          : ledger.category(row.id)!.name,
+                      amount: row.amount,
+                      total: spending.total,
+                      other: row.id.isEmpty,
+                      // A single bar is all of it; the amount says as much.
+                      showBar: categories.length > 1,
+                      selected: filter == (bill: false, id: row.id),
+                      dimmed: filter?.bill == false && filter?.id != row.id,
+                      onTap: () => _toggle((bill: false, id: row.id)),
+                    ),
+                  if (bills.isNotEmpty) ...[
                     const SectionHeader('By bill'),
-                    for (final row in spending.byBill)
+                    for (final row in bills)
                       _BarRow(
                         key: ValueKey('bill/${row.id}'),
                         label: ledger.bill(row.id)!.name,
@@ -136,11 +167,6 @@ class _SpendingScreenState extends State<SpendingScreen> {
                             child: const Text('Show all'),
                           ),
                   ),
-                  if (items.isEmpty)
-                    EmptyNote(
-                      'Nothing in ${_label(ledger, filter!)} '
-                      'in ${monthName(month)}.',
-                    ),
                 ],
               ],
             ),
@@ -196,42 +222,6 @@ class _SpendingScreenState extends State<SpendingScreen> {
       -1 => '${rupees(-difference)} less than $than',
       _ => 'The same as $than',
     };
-  }
-
-  List<Widget> _byCategory(Ledger ledger, Spending spending, _Filter? filter) {
-    final rows = spending.byCategory;
-    const header = SectionHeader('By category');
-    // One "No category" bar would say nothing, so say how to get a picture.
-    if (rows.every((row) => row.id.isEmpty)) {
-      return [
-        header,
-        EmptyNote(
-          ledger.categories.isEmpty
-              ? 'Add categories with /category, or while adding an '
-                    'expense, to see what your money goes on.'
-              : 'None of these expenses has a category yet. Tap one below '
-                    'to give it one.',
-        ),
-      ];
-    }
-    return [
-      header,
-      for (final row in rows)
-        _BarRow(
-          key: ValueKey('category/${row.id}'),
-          label: row.id.isEmpty
-              ? CategoryFlow.noCategory
-              : ledger.category(row.id)!.name,
-          amount: row.amount,
-          total: spending.total,
-          other: row.id.isEmpty,
-          // A single bar is all of it; the amount says as much.
-          showBar: rows.length > 1,
-          selected: filter == (bill: false, id: row.id),
-          dimmed: filter?.bill == false && filter?.id != row.id,
-          onTap: () => _toggle((bill: false, id: row.id)),
-        ),
-    ];
   }
 
   static bool _matches(Ledger ledger, _Filter? filter, Expense e) =>
@@ -371,7 +361,13 @@ class _BarRow extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           color: selected ? scheme.surfaceContainerHigh : null,
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+          // At least 48dp tall to tap, even without a bar.
+          padding: EdgeInsets.fromLTRB(
+            20,
+            showBar ? 10 : 12,
+            20,
+            showBar ? 10 : 12,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

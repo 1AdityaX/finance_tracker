@@ -6,6 +6,7 @@ import 'package:finance_tracker/data/store.dart';
 import 'package:finance_tracker/main.dart';
 import 'package:finance_tracker/screens/widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support.dart';
@@ -848,5 +849,59 @@ void main() {
     expect(store.ledger.expenses.single.categoryId, isNull);
     await tester.tapText('Undo');
     expect(store.ledger.expenses.single.categoryId, 'travel');
+  });
+
+  testWidgets('the review’s date is its own button for screen readers', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpApp(tester, ledgerWith(expenses: [expense()]));
+    await tester.tapText('Dinner');
+    final card = tester.getSemantics(find.text('Dinner').last);
+    expect(card.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
+    expect(find.bySemanticsLabel(RegExp(r'^Date: .*\. Change$')), findsOne);
+    semantics.dispose();
+  });
+
+  testWidgets('a narrowed list follows the rows on screen', (tester) async {
+    final now = DateTime.now();
+    await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [
+          expense(
+            name: 'Flat',
+            parts: {me: 1},
+            categoryId: 'rent',
+            date: DateTime(now.year, now.month),
+          ),
+          expense(
+            id: 'e2',
+            name: 'Snack',
+            parts: {me: 1},
+            date: DateTime(now.year, now.month - 1),
+          ),
+        ],
+      ),
+    );
+    await tester.tapText('Spent in ${monthName(now)}');
+    // One category this month: no bar, but still a full-size target.
+    final row = find.ancestor(
+      of: find.text('Rent'),
+      matching: find.byType(InkWell),
+    );
+    expect(tester.getSize(row).height, greaterThanOrEqualTo(48));
+    await tester.tapText('Rent');
+    expect(find.text('Show all'), findsOneWidget);
+
+    // Last month has no Rent row, so nothing is narrowed there.
+    await tester.tap(find.byTooltip('Previous month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Show all'), findsNothing);
+    await tester.reveal(find.text('Snack'));
+    expect(find.text('Snack'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    expect(find.text('Show all'), findsOneWidget);
   });
 }

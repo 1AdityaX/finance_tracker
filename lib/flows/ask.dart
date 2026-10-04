@@ -138,7 +138,6 @@ final class MultiPickAsk extends Ask {
     required this.describe,
     List<String> selected = const [],
     this.creator,
-    this.emptyProblem,
   }) : selected = [...selected];
 
   final List<Choice> Function() choices;
@@ -148,15 +147,13 @@ final class MultiPickAsk extends Ask {
   final List<String> selected;
   final Creator? creator;
 
-  /// Why picking nobody won't do, or null when it's a fine answer.
-  final String? emptyProblem;
-
   List<Choice> get chosen => [
     for (final id in selected) ...choices().where((c) => c.id == id),
   ];
 
+  /// Picking nobody is a fine answer: an expense can be just yours.
   @override
-  String? get problem => chosen.isEmpty ? emptyProblem : null;
+  String? get problem => null;
 
   @override
   String get phrase => describe(chosen);

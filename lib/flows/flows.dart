@@ -68,7 +68,7 @@ abstract class CommandFlow {
   ({Ledger ledger, String message})? delete([Ledger? onto]) => null;
 }
 
-/// A single-question flow that names something: a bill or a friend.
+/// A single-question flow that names something: a bill, friend or category.
 abstract class _NameFlow extends CommandFlow {
   _NameFlow(super.ledger);
   late final TextAsk name;
@@ -456,7 +456,10 @@ class ExpenseFlow extends CommandFlow with _Creates {
       if ((shares[me] ?? 0) > 0)
         [
           Line(
-            'Spent in ${monthName(expense.date)}',
+            [
+              'Spent in ${monthName(expense.date)}',
+              if (expense.date.year != DateTime.now().year) expense.date.year,
+            ].join(' '),
             rupees(Spending(after, expense.date).total),
             detail: 'Including this',
           ),
