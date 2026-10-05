@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../cloud/account.dart';
 import '../data/ledger.dart';
 import '../data/money.dart';
 import '../data/spending.dart';
 import '../data/store.dart';
 import '../flows/flows.dart';
 import '../theme.dart';
+import 'backup.dart';
 import 'bill_screen.dart';
 import 'friend_screen.dart';
 import 'spending_screen.dart';
@@ -71,8 +73,11 @@ final commands = [
 ];
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.store});
+  const HomeScreen({super.key, required this.store, this.account});
   final Store store;
+
+  /// Google sign-in for cloud backup, when this build has Firebase.
+  final Account? account;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -168,7 +173,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        body: _choosing ? _commandList() : _overview(),
+        body: _choosing
+            ? _commandList()
+            : switch (widget.account) {
+                final account? => ListenableBuilder(
+                  listenable: account,
+                  builder: (context, _) => _overview(),
+                ),
+                null => _overview(),
+              },
         // In the bottom bar slot, snackbars float above the command bar. The
         // padding lifts it above the keyboard, which only resizes the body.
         bottomNavigationBar: Padding(
@@ -306,6 +319,18 @@ class _HomeScreenState extends State<HomeScreen> {
         final bySize = balances[b.id]!.abs().compareTo(balances[a.id]!.abs());
         return bySize != 0 ? bySize : recent.indexOf(a) - recent.indexOf(b);
       });
+    // Asking to back up comes first; once backed up, it's a note at the end.
+    final backup = switch (widget.account) {
+      final account? => [
+        const SectionHeader('Backup'),
+        BackupTile(account: account),
+      ],
+      null => const <Widget>[],
+    };
+    final backedUp = switch (widget.account?.state) {
+      SyncState.synced || SyncState.syncing => true,
+      _ => false,
+    };
     return CustomScrollView(
       slivers: [
         SliverList.list(
@@ -314,6 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: _Headline(friends: friends, balances: balances),
             ),
+            if (!backedUp) ...backup,
             const SectionHeader('Spending'),
             _spendingTile(ledger),
             const SectionHeader('Friends'),
@@ -339,6 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
           payments: ledger.payments,
           limit: 5,
         ),
+        if (backedUp) SliverList.list(children: backup),
         const SliverPadding(padding: EdgeInsets.only(bottom: 16)),
       ],
     );
@@ -408,6 +435,15 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: const Icon(Icons.add),
           label: const Text('Add your first expense'),
         ),
+        if (widget.account case final account?
+            when account.state == SyncState.signedOut) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => signInWithGoogle(context, account),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('Restore from Google'),
+          ),
+        ],
       ],
     );
   }

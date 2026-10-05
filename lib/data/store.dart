@@ -13,19 +13,23 @@ abstract interface class Storage {
 
 /// Keeps the ledger in one SQLite row, so every save is a single atomic write.
 class SqliteStorage implements Storage {
-  SqliteStorage({DatabaseFactory? factory, this.path})
-    : _factory = factory ?? databaseFactory;
+  SqliteStorage({
+    DatabaseFactory? factory,
+    this.path,
+    this.name = 'shared_expenses.db',
+  }) : _factory = factory ?? databaseFactory;
   final DatabaseFactory _factory;
 
-  /// Defaults to `shared_expenses.db` in the app's database folder.
+  /// Defaults to [name] in the app's database folder.
   final String? path;
+  final String name;
 
   /// Cached as a future so concurrent first calls open the database once.
   Future<Database>? _db;
 
   Future<Database> _open() => _db ??= () async {
     return _factory.openDatabase(
-      path ?? '${await _factory.getDatabasesPath()}/shared_expenses.db',
+      path ?? '${await _factory.getDatabasesPath()}/$name',
       options: OpenDatabaseOptions(
         version: 1,
         onCreate: (db, _) => db.execute(
@@ -82,6 +86,16 @@ class Store extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  /// Reads the ledger again after something other than this store changed
+  /// what is saved, such as a sync, without leaving the screen. Undo can't
+  /// reach past it.
+  Future<void> reload() async {
+    final json = await _storage.read();
+    _ledger = json == null ? Ledger.empty : decodeLedger(json);
+    _undo.clear();
+    notifyListeners();
   }
 
   /// Saves [next] and remembers the current ledger so [undo] can restore it.

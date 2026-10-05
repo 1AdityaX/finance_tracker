@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:finance_tracker/cloud/account.dart';
 import 'package:finance_tracker/data/ledger.dart';
 import 'package:finance_tracker/data/spending.dart';
 import 'package:finance_tracker/data/store.dart';
@@ -11,12 +12,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support.dart';
 
-Future<Store> pumpApp(WidgetTester tester, [Ledger? ledger]) async {
+Future<Store> pumpApp(
+  WidgetTester tester, [
+  Ledger? ledger,
+  Account? account,
+]) async {
   final store = Store(
     MemoryStorage(ledger == null ? null : jsonEncode(ledger.toJson())),
   );
   await store.load();
-  await tester.pumpWidget(BetweenApp(store: store));
+  await tester.pumpWidget(BetweenApp(store: store, account: account));
   await tester.pumpAndSettle();
   return store;
 }
@@ -1034,4 +1039,112 @@ void main() {
     await tester.tapText('Save changes');
     expect(store.ledger.payments.single.settles, {'e1': 60000});
   });
+
+  group('backup to Google', () {
+    testWidgets('asks first, then notes it at the end once backed up', (
+      tester,
+    ) async {
+      final account = FakeAccount();
+      await pumpApp(tester, ledgerWith(), account);
+      final spending = tester.getTopLeft(find.text('Spending')).dy;
+      expect(
+        tester.getTopLeft(find.text('Back up to Google')).dy,
+        lessThan(spending),
+      );
+
+      await tester.tapText('Back up to Google');
+      expect(account.state, SyncState.synced);
+      await tester.reveal(find.text('Backed up to Google'));
+      expect(find.text('aditya@example.com'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Backed up to Google')).dy,
+        greaterThan(tester.getTopLeft(find.text('Recent')).dy),
+      );
+    });
+
+    testWidgets('says why signing in failed', (tester) async {
+      final account = FakeAccount()
+        ..failure = const SignInFailure('Couldn’t sign in.');
+      await pumpApp(tester, ledgerWith(), account);
+      await tester.tapText('Back up to Google');
+      expect(find.text('Couldn’t sign in.'), findsOneWidget);
+      expect(account.state, SyncState.signedOut);
+    });
+
+    testWidgets('a fresh install offers to restore', (tester) async {
+      final account = FakeAccount();
+      await pumpApp(tester, null, account);
+      await tester.tapText('Restore from Google');
+      expect(account.state, SyncState.synced);
+      expect(find.text('Restore from Google'), findsNothing);
+    });
+
+    testWidgets('signing out keeps every record', (tester) async {
+      final account = FakeAccount()..state = SyncState.synced;
+      final store = await pumpApp(
+        tester,
+        ledgerWith(expenses: [expense()]),
+        account,
+      );
+      await tester.tapText('Backed up to Google');
+      await tester.tapText('Sign out');
+      expect(account.state, SyncState.signedOut);
+      expect(store.ledger.expenses, hasLength(1));
+      // The invitation to back up is back at the top.
+      await tester.fling(
+        find.byType(CustomScrollView),
+        const Offset(0, 3000),
+        3000,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Back up to Google'), findsOneWidget);
+    });
+
+    testWidgets('a failed sync can be tried again', (tester) async {
+      final account = FakeAccount()..state = SyncState.failed;
+      await pumpApp(tester, ledgerWith(), account);
+      expect(find.textContaining('safe on this phone'), findsOneWidget);
+      await tester.tapText('Couldn’t back up');
+      expect(account.state, SyncState.synced);
+    });
+
+    testWidgets('without Firebase there is no backup row', (tester) async {
+      await pumpApp(tester, ledgerWith());
+      expect(find.text('Back up to Google'), findsNothing);
+      expect(find.text('Backup'), findsNothing);
+    });
+  });
+}
+
+/// An account that signs in at once, as aditya@example.com.
+class FakeAccount extends Account {
+  @override
+  SyncState state = SyncState.signedOut;
+
+  /// When set, signing in throws it.
+  SignInFailure? failure;
+
+  @override
+  String? get email =>
+      state == SyncState.signedOut ? null : 'aditya@example.com';
+
+  @override
+  Future<bool> signIn() async {
+    if (failure case final failure?) throw failure;
+    state = SyncState.synced;
+    notifyListeners();
+    return true;
+  }
+
+  @override
+  Future<void> signOut() async {
+    state = SyncState.signedOut;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> retry() async {
+    state = SyncState.synced;
+    notifyListeners();
+  }
 }

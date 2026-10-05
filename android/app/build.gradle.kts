@@ -7,6 +7,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Cloud backup is optional. With android/app/google-services.json from your
+// Firebase project the app can sign in and back up to Firestore; without it
+// the app builds and runs as before, with records only on the phone.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Release signing is read from android/key.properties, which is gitignored.
 // See https://docs.flutter.dev/deployment/android#sign-the-app
 val keystorePropertiesFile = rootProject.file("key.properties")

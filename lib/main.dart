@@ -1,17 +1,32 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'cloud/account.dart';
+import 'data/cloud.dart';
 import 'data/store.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(BetweenApp(store: Store(SqliteStorage())..load()));
+  final storage = SyncedStorage(
+    local: SqliteStorage(),
+    base: SqliteStorage(name: 'cloud_base.db'),
+  );
+  final store = Store(storage);
+  // Null when this build has no Firebase project: records stay on the phone.
+  final account = await GoogleAccount.start(store, storage);
+  unawaited(store.load());
+  runApp(BetweenApp(store: store, account: account));
 }
 
 class BetweenApp extends StatelessWidget {
-  const BetweenApp({super.key, required this.store});
+  const BetweenApp({super.key, required this.store, this.account});
   final Store store;
+
+  /// Google sign-in for cloud backup, when this build has Firebase.
+  final Account? account;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -28,7 +43,7 @@ class BetweenApp extends StatelessWidget {
           );
         }
         if (store.loadError != null) return _LoadError(store: store);
-        return HomeScreen(store: store);
+        return HomeScreen(store: store, account: account);
       },
     ),
   );
