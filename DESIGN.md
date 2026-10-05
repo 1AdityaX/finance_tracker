@@ -240,6 +240,7 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 ### Rows (signature)
 - **Friend row:** an avatar initial, the name, and the balance phrase in its balance colour.
 - **Settle row:** on a payment's "Which expenses?" page, a checkbox row per open expense. Unticked, the subtitle is what is open in its balance colour; ticked, it is what this payment puts toward it ("₹16 of ₹17.50, ₹1.50 left"), in muted text. A live status line above the list says where the money goes. When an expense gets nothing, its row says so in amber and the problem shows above Continue.
+- **Backup row:** a row badge (cloud off, syncing or done), a title saying the state ("Back up to Google", "Backing up…", "Backed up to Google", "Couldn't back up") and a subtitle with the account or what to do. It sits under the headline until backup is on, then moves to the end of home. A failure is reassurance first ("Your records are safe on this phone") in amber, never error red.
 - **Activity row:** a 40px row badge (receipt, or a north-east or south-west arrow), the title, a subtitle of facts joined with " · ", and a TrailingAmount (Title Small, tabular, signed and coloured on a friend's screen).
 
 ## Do's and Don'ts

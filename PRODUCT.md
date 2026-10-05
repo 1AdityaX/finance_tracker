@@ -20,7 +20,7 @@ Record what was spent, who paid and who owes whom, then record money sent or rec
 
 ## Positioning
 
-Private and local-first: every record stays on the device in SQLite. No accounts, sync, bank links, or messages sent on the user's behalf.
+Private and local-first: every record lives on the device in SQLite and the app works fully offline. Backup to the user's own Google account (Firestore) is optional and off until they sign in. No bank links, and no messages sent on the user's behalf.
 
 ## Operating Context
 
@@ -53,7 +53,7 @@ No real user data, testimonials or metrics exist. Screens use synthetic names an
 2. Every answer has a sensible default, so a common expense takes a few taps.
 3. Money is exact. Shares always add up to the total, and the app says what is left to assign.
 4. Nothing interrupts saving. A save is instant and reversible with Undo; the only question the app asks is before throwing away answers that were never saved.
-5. Private by default. Nothing leaves the device.
+5. Private by default. Nothing leaves the device unless the user signs in to back up, and then only to their own account.
 
 ## Accessibility & Inclusion
 

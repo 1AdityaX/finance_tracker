@@ -1,6 +1,6 @@
 # Between
 
-A private, local-first Flutter app for tracking what you spend, on your own or shared with friends, and what's owed between you. Every record stays in a SQLite database on the device: no accounts, cloud sync, bank connections, or messages sent for you.
+A private, local-first Flutter app for tracking what you spend, on your own or shared with friends, and what's owed between you. Every record is kept in a SQLite database on the device and works fully offline. Signing in with Google is optional: it backs your records up to Firestore so they survive a reinstall or move to a new phone. No bank connections, and no messages sent for you.
 
 Target platforms: Android and iOS.
 
@@ -41,6 +41,17 @@ Spending is your share of each expense: all of an expense that was just yours, y
 
 Categories are your own; there is no preset list. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed and deleted. Deleting a category keeps its expenses, without a category.
 
+## Cloud backup
+
+On Android, the home screen offers **Back up to Google**. After signing in once:
+
+- Every change is saved on the phone first, then copied to Firestore in the background. Offline changes are sent when the phone is back online.
+- On a reinstall or a new phone, **Restore from Google** on the welcome screen, or **Back up to Google** on home, brings every record back.
+- Changes made on another phone arrive the next time the app opens. Copies are merged record by record: a record changed on one side takes that side's version, so additions, edits and deletions all carry over. A record changed on both sides keeps this phone's version, and an edit is never lost to a deletion.
+- Signing out keeps every record on the phone; new changes just aren't backed up.
+
+Each person's records live under `users/{uid}` in Firestore, one document per record, and security rules let a signed-in user read and write only their own. Backup is optional at build time too: without a Firebase config the app builds and runs with records on the phone only, and the backup row doesn't appear. iOS isn't set up for backup yet.
+
 ## Getting started
 
 Requirements: Flutter 3.44 (stable channel, Dart 3.12) and an Android emulator or device, or Xcode with an iOS simulator.
@@ -50,17 +61,23 @@ flutter pub get
 flutter run
 ```
 
+That's all you need to work on the app. To try cloud backup, sign release builds, or contribute, see [CONTRIBUTING.md](CONTRIBUTING.md), which walks through setting up Firebase and a signing key locally.
+
 ## Project structure
 
 ```
 lib/
-  main.dart              App entry, loading and load-error screens
+  main.dart              App entry: storage, cloud backup when set up, load-error screen
   theme.dart             Material 3 theme (light and dark), balance and chart colours
   data/
     money.dart           Paise formatting, parsing, and exact apportioning
     ledger.dart          Friend, Bill, Category, Expense, Payment, balance queries
     spending.dart        Your spending in a month, by category and by bill
     store.dart           Persistence (SQLite), undo, and upgrading old data
+    cloud.dart           Syncing with a cloud copy: diffs, three-way merge, SyncedStorage
+  cloud/
+    firestore_cloud.dart The ledger in Firestore, one document per record
+    account.dart         Google sign-in, and keeping the ledger in step with Firestore
   flows/
     ask.dart             Question types: text, amount, count, pick, multi-pick, split
     flows.dart           The command flows: expense, payment, bill, friend, category
@@ -72,8 +89,9 @@ lib/
     bill_screen.dart     One bill's expenses and balances
     spending_screen.dart A month of spending: total, comparison, bars, expenses
     categories_screen.dart  Adding, renaming and deleting categories
+    backup.dart          The "Back up to Google" row and signing in
     widgets.dart         Shared rows, labels, and the undo snackbar
-test/                    Unit tests for data and flows, widget tests for every flow
+test/                    Unit tests for data, sync and flows, widget tests for every flow
 ```
 
 ### Adding or changing a question
@@ -114,6 +132,8 @@ The document carries a `version`, now 4. Version 3 added categories, and version
 
 Undo history holds the last 50 changes, in memory only.
 
+When backed up, `SyncedStorage` (`lib/data/cloud.dart`) wraps the SQLite storage. It writes to the phone first and sends each change to Firestore without waiting. It also keeps what the cloud last held in `cloud_base.db`, so that connecting can tell what changed on each side since. All of the merging is plain Dart, tested in `test/cloud_test.dart` against an in-memory cloud.
+
 ## Development
 
 ```sh
@@ -137,7 +157,7 @@ Widget tests drive a simulated keyboard, so check these by hand on a real device
 
 **Application ID.** The app still uses the Flutter template identifiers `com.example.finance_tracker` (Android) and `com.example.financeTracker` (iOS). Choose permanent identifiers before publishing; they cannot change after release.
 
-**Android signing.** Release builds read signing credentials from `android/key.properties`, which is gitignored:
+**Android signing.** Release builds must always be signed with the same key: Android only installs an update over an app signed with the same key, and uninstalling erases its records. Release builds read signing credentials from `android/key.properties`, which is gitignored (CONTRIBUTING.md shows how to make a key):
 
 ```properties
 storePassword=<keystore password>
@@ -152,4 +172,4 @@ Without this file, release builds fall back to debug signing so `flutter run --r
 
 ## Not yet implemented
 
-Receipt scanning, bank imports, budgets, notifications, and cross-device sync.
+Receipt scanning, bank imports, budgets, notifications, live sync between phones open at the same time, and cloud backup on iOS.
