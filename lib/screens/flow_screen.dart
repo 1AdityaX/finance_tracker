@@ -77,7 +77,10 @@ class _FlowScreenState extends State<FlowScreen> {
     final ask = current;
     if (ask == null) {
       // Opening a record to look at it, then leaving, saves nothing.
-      flow.editing && !edited ? _close() : _save();
+      if (flow.editing && !edited) return unawaited(_close());
+      // Never save past a question that needs another look.
+      if (_firstOpen() case final open?) return _show(open);
+      _save();
       return;
     }
     if (ask.problem != null) {
@@ -211,10 +214,13 @@ class _FlowScreenState extends State<FlowScreen> {
       for (final a in flow.asks)
         if (a != current && _done(a)) a,
     ];
-    // The split page shows its own problem as it changes.
-    final problem = showProblem && current is! SplitAsk
-        ? current?.problem
-        : saveError;
+    // The split page shows its own problem as it changes. A settle problem
+    // shows here as soon as a tick causes it, where it can't scroll away.
+    final problem = switch (current) {
+      SplitAsk() || null => saveError,
+      SettleAsk(:final problem?) => problem,
+      final ask => showProblem ? ask.problem : null,
+    };
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     // Read here: inside the Scaffold body the keyboard inset is already gone.
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;

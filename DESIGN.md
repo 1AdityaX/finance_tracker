@@ -220,7 +220,7 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 - **Mode chips:** ChoiceChips in the split editor (Equally, By quantity, By percentage, By amount).
 
 ### Cards / Containers
-- **Review panel:** surface-container-low, rounded at 20px, 20px padding, no border or shadow. Shows the title, a display-size total and a date row (event icon, the date, a primary "Change"; a 48dp target that opens the date picker), then sections split by hairline dividers: per-person lines (left out when the expense is just yours), who-owes-whom lines in balance colours with "After this:" captions, and "Spent in <Month>" with "Including this".
+- **Review panel:** surface-container-low, rounded at 20px, 20px padding, no border or shadow. Shows the title, a display-size total and a date row (event icon, the date, a primary "Change"; a 48dp target that opens the date picker), then sections split by hairline dividers: for a payment, what goes to each expense it pays toward ("Paid in full" or what is "still open"); per-person lines (left out when the expense is just yours), who-owes-whom lines in balance colours with "After this:" captions, and "Spent in <Month>" with "Including this".
 - **Command dock:** a full-width bottom bar on surface-container-low with a top divider. It holds wrapping command chips over a filled command field with a primary "/" prefix.
 
 ### Inputs / Fields
@@ -239,6 +239,7 @@ Soft and consistent. Controls (filled buttons, filled inputs) round at 16px. The
 
 ### Rows (signature)
 - **Friend row:** an avatar initial, the name, and the balance phrase in its balance colour.
+- **Settle row:** on a payment's "Which expenses?" page, a checkbox row per open expense. Unticked, the subtitle is what is open in its balance colour; ticked, it is what this payment puts toward it ("₹16 of ₹17.50, ₹1.50 left"), in muted text. A live status line above the list says where the money goes. When an expense gets nothing, its row says so in amber and the problem shows above Continue.
 - **Activity row:** a 40px row badge (receipt, or a north-east or south-west arrow), the title, a subtitle of facts joined with " · ", and a TrailingAmount (Title Small, tabular, signed and coloured on a friend's screen).
 
 ## Do's and Don'ts

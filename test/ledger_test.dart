@@ -112,6 +112,102 @@ void main() {
     });
   });
 
+  group('a payment toward several expenses', () {
+    // Rahul owes ₹15 for a lollipop and ₹17.50 for nachos, and sends ₹31.
+    final lollipop = expense(id: 'lolly', name: 'Lollipop', amount: 3000);
+    final nachos = expense(id: 'nachos', name: 'Nachos', amount: 3500);
+    final sent31 = payment(
+      amount: 3100,
+      settles: {'lolly': 1500, 'nachos': 1600},
+    );
+
+    test('pays off each expense by its part', () {
+      final ledger = ledgerWith(
+        expenses: [lollipop, nachos],
+        payments: [sent31],
+      );
+      expect(ledger.expenseBalances('rahul'), {'lolly': 0, 'nachos': 150});
+      expect(ledger.balance('rahul', expenseId: 'nachos'), 150);
+      expect(ledger.balance('rahul'), 150);
+      expect(ledger.balances(), {'rahul': 150});
+    });
+
+    test('counts each part in its expense’s bill, the rest in its own', () {
+      final ledger = ledgerWith(
+        expenses: [
+          lollipop,
+          expense(id: 'nachos', amount: 3500, billId: 'goa'),
+        ],
+        payments: [
+          payment(amount: 4000, settles: {'lolly': 1500, 'nachos': 1600}),
+        ],
+      );
+      expect(ledger.billBalances('rahul'), {generalBill: -900, 'goa': 150});
+      expect(ledger.balance('rahul', billId: 'goa'), 150);
+      expect(ledger.balances(billId: generalBill), {'rahul': -900});
+    });
+
+    test('follows its expenses once they have all moved', () {
+      final ledger = ledgerWith(
+        expenses: [lollipop, nachos],
+        payments: [
+          payment(amount: 3250, settles: {'lolly': 1500, 'nachos': 1750}),
+        ],
+      );
+      final one = ledger.put(
+        expense: expense(id: 'lolly', amount: 3000, billId: 'goa'),
+      );
+      expect(one.payment('p1')!.billId, generalBill);
+      final both = one.put(
+        expense: expense(id: 'nachos', amount: 3500, billId: 'goa'),
+      );
+      expect(both.payment('p1')!.billId, 'goa');
+    });
+
+    test('stays in its bill when one of its expenses moves', () {
+      final ledger =
+          ledgerWith(expenses: [lollipop, nachos], payments: [sent31]).put(
+            expense: expense(id: 'nachos', amount: 3500, billId: 'goa'),
+          );
+      expect(ledger.payment('p1')!.billId, generalBill);
+      expect(ledger.payment('p1')!.settles, sent31.settles);
+      expect(ledger.balance('rahul', billId: 'goa'), 150);
+    });
+
+    test('keeps any rest in its own bill when its expense moves', () {
+      // ₹31 in General, only ₹15 of it toward the lollipop.
+      final paid = payment(amount: 3100, settles: {'lolly': 1500});
+      final ledger = ledgerWith(expenses: [lollipop], payments: [paid]);
+      expect(ledger.billBalances('rahul'), {generalBill: -1600});
+      final moved = ledger.put(
+        expense: expense(id: 'lolly', amount: 3000, billId: 'goa'),
+      );
+      expect(moved.payment('p1')!.billId, generalBill);
+      expect(moved.billBalances('rahul'), {generalBill: -1600, 'goa': 0});
+      // Changing an expense without moving it never moves a payment.
+      final elsewhere =
+          ledgerWith(
+            expenses: [lollipop],
+            payments: [
+              payment(amount: 1500, billId: 'goa', expenseId: 'lolly'),
+            ],
+          ).put(
+            expense: expense(id: 'lolly', name: 'Lolly', amount: 3000),
+          );
+      expect(elsewhere.payment('p1')!.billId, 'goa');
+    });
+
+    test('loses only the part for a deleted expense', () {
+      final ledger = ledgerWith(
+        expenses: [lollipop, nachos],
+        payments: [sent31],
+      ).removeExpense('lolly');
+      expect(ledger.payment('p1')!.settles, {'nachos': 1600});
+      expect(ledger.payment('p1')!.unassigned, 1500);
+      expect(ledger.balance('rahul'), 1750 - 3100);
+    });
+  });
+
   group('changes', () {
     test('put replaces by id or appends', () {
       final ledger = ledgerWith(expenses: [expense()]);
@@ -130,7 +226,7 @@ void main() {
         ],
       ).put(expense: expense(billId: 'goa'));
       expect(ledger.payment('p1')!.billId, 'goa');
-      expect(ledger.payment('p1')!.expenseId, 'e1');
+      expect(ledger.payment('p1')!.settles, {'e1': 20000});
       expect(ledger.payment('p2')!.billId, generalBill);
       expect(ledger.balance('rahul', billId: 'goa'), 60000 - 20000);
     });
@@ -140,7 +236,7 @@ void main() {
         expenses: [expense()],
         payments: [payment(expenseId: 'e1')],
       ).removeExpense('e1');
-      expect(ledger.payments.single.expenseId, isNull);
+      expect(ledger.payments.single.settles, isEmpty);
       expect(ledger.balance('rahul'), -20000);
     });
 
@@ -154,7 +250,7 @@ void main() {
         expect(ledger.bill('goa'), isNull);
         expect(ledger.expenses, isEmpty);
         expect(ledger.payments.single.billId, generalBill);
-        expect(ledger.payments.single.expenseId, isNull);
+        expect(ledger.payments.single.settles, isEmpty);
       },
     );
 

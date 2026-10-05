@@ -35,6 +35,7 @@ Expense expense({
   categoryId: categoryId,
 );
 
+/// A payment, wholly toward [expenseId] when given, or as [settles] says.
 Payment payment({
   String id = 'p1',
   String friendId = 'rahul',
@@ -42,13 +43,14 @@ Payment payment({
   int amount = 20000,
   String billId = generalBill,
   String? expenseId,
+  Map<String, int>? settles,
 }) => Payment(
   id: id,
   friendId: friendId,
   direction: direction,
   amount: amount,
   billId: billId,
-  expenseId: expenseId,
+  settles: settles ?? {?expenseId: amount},
   date: day.add(const Duration(hours: 1)),
 );
 

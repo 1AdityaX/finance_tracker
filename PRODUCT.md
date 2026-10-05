@@ -32,7 +32,7 @@ Every action starts from a slash command (`/expense`, `/bill`, `/sent`, `/receiv
 - **Expense:** a name, a category (optional), a bill, the amount paid, a quantity (default 1), the friends involved, who paid (you or one of them), each person's share, and a date (today unless changed on the review). With no friends it is just yours, and who paid and the split are not asked. Shares can be split equally, by quantity (only when quantity is above 1), by percentage, or by exact rupees.
 - **Category:** a kind of spending, named by the user. The owner asked for no preset list (October 2026). Deleting one keeps its expenses, uncategorised.
 - **Spending:** your share of each expense in a calendar month, by category and by bill, compared with the month before. Money paid for friends and payments between friends are not spending.
-- **Sent / received payments:** an amount, a friend, a bill (General by default, searchable) and an expense in that bill (searchable). Sent money reduces what you owe them. Received money reduces what they owe you.
+- **Sent / received payments:** an amount, a friend, a bill (General by default, searchable) and the expenses in that bill it pays toward (none, one or several, searchable). The amount goes to the ticked expenses in the order ticked, each up to what is still open; the rest counts toward the overall balance. Sent money reduces what you owe them. Received money reduces what they owe you.
 - Money is stored as integer paise (INR). Splits always add up exactly to the total.
 - Records can be corrected or deleted, and every change can be undone *(inferred: carried over from the previous app)*.
 - Records saved by the previous version on a device must survive the update *(inferred)*.

@@ -60,6 +60,36 @@ void main() {
       expect(ledger.balance('rahul'), 60000);
     });
 
+    test('reads version 3 payments, which went wholly to one expense', () {
+      final json = ledgerWith(expenses: [expense()]).toJson()
+        ..['version'] = 3
+        ..['payments'] = [
+          {
+            'id': 'p1',
+            'friend': 'rahul',
+            'direction': 'received',
+            'amount': 70000,
+            'bill': generalBill,
+            'expense': 'e1',
+            'date': day.toIso8601String(),
+          },
+          {
+            'id': 'p2',
+            'friend': 'rahul',
+            'direction': 'received',
+            'amount': 100,
+            'bill': generalBill,
+            'expense': null,
+            'date': day.toIso8601String(),
+          },
+        ];
+      final ledger = decodeLedger(jsonEncode(json));
+      expect(ledger.payment('p1')!.settles, {'e1': 70000});
+      expect(ledger.payment('p2')!.settles, isEmpty);
+      expect(ledger.expenseBalances('rahul'), {'e1': -10000});
+      expect(ledger.balance('rahul'), -10100);
+    });
+
     test('refuses data from a newer version', () {
       expect(
         () => decodeLedger(jsonEncode({'version': 99})),
@@ -323,12 +353,12 @@ void main() {
     });
 
     test('splits payments per friend and links what they settled', () {
-      expect(ledger.payment('t1')!.expenseId, 'lunch');
+      expect(ledger.payment('t1')!.settles.keys, ['lunch']);
       final toRahul = ledger.payment('t2-r')!;
       expect(toRahul.amount, 40000);
       expect(toRahul.direction, Direction.sent);
       expect(toRahul.billId, 'groceries');
-      expect(toRahul.expenseId, isNull);
+      expect(toRahul.settles, isEmpty);
       expect(ledger.payment('t2-p')!.billId, generalBill);
     });
 

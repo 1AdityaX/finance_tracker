@@ -11,15 +11,15 @@ Every action starts from a slash command. Tap one of the shortcuts above the com
 | Command | Questions, in order |
 | --- | --- |
 | `/expense` | What was it for? · Which category? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
-| `/sent` | How much? · To whom? · Which bill? · Which expense? |
-| `/receive` | How much? · From whom? · Which bill? · Which expense? |
+| `/sent` | How much? · To whom? · Which bill? · Which expenses? |
+| `/receive` | How much? · From whom? · Which bill? · Which expenses? |
 | `/bill` | What's it called? |
 | `/friend` | What's their name? |
 | `/category` | What's it called? |
 | `/spending` | Opens where your money went, month by month |
 | `/undo` | Reverts the last change |
 
-- **Defaults are filled in.** The category starts as none, the bill as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expense as "not for a particular expense". Accepting a default is one tap.
+- **Defaults are filled in.** The category starts as none, the bill as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expenses as none (toward the overall balance). Accepting a default is one tap.
 - **Questions that don't apply are skipped.** An expense nobody shared is just yours, so who paid and how to split it are only asked once you pick a friend. Splitting by quantity appears only when there is more than one unit. Started from a bill's or friend's page, that answer is filled in and skipped, but still shows as a chip.
 - **Answers so far show as chips** at the top of every page, for example `Pizza · in Goa trip · ₹1,200 · 4 units`. Tap one to change it; the flow then returns to the first question that needs another look, or straight to the review.
 - **Back goes to the previous page**, including the system back gesture, and keeps every answer. Closing a flow asks first only if answers would be lost.
@@ -101,14 +101,16 @@ To add a command, write a `CommandFlow` subclass and add a `Command` to the list
 - Percentages are stored as basis points, so 33.33% is exact.
 - If exactly one person's share is left blank, they get whatever is left.
 - A positive balance means the friend owes you; negative means you owe them. Expenses solely between other people don't affect your balances.
-- Money received lowers what a friend owes you. Money sent lowers what you owe them. Linking a payment to an expense marks that expense as paid without counting the money twice.
-- Deleting an expense keeps its payments in the balance. Deleting a bill deletes its expenses and moves its payments to General.
+- Money received lowers what a friend owes you. Money sent lowers what you owe them.
+- One payment can pay toward several expenses. Tick them on "Which expenses?" and the amount goes to them in the order ticked, each taking up to what is still open on it: ₹31 for ₹15 of lollipops then ₹17.50 of nachos pays the lollipops in full and ₹16 of the nachos, leaving ₹1.50 open. Whatever the expenses don't take counts toward the overall balance. If the money runs out before a ticked expense, the page says so and won't continue until it is unticked or ticked earlier. The money is never counted twice.
+- What a payment puts toward an expense counts in that expense's bill; the rest counts in the payment's bill. A bill's page lists every payment with money in it. Opening a payment never moves its money: it keeps its split until you change the amount or the ticks.
+- Deleting an expense keeps its payments in the balance; what they put toward it counts toward the overall balance instead. Deleting a bill deletes its expenses and moves its payments to General.
 
 ## Data
 
 The whole ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement on every change. A failed save leaves the previous state in place, and a failed load is reported without writing anything.
 
-The document carries a `version`, now 3, which added categories; version 2 data reads as is, with none. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
+The document carries a `version`, now 4. Version 3 added categories, and version 4 lets a payment pay toward several expenses (`settles`: expense id to paise, in order); older data reads as is, with a payment that named an expense putting its whole amount toward it. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
 
 Undo history holds the last 50 changes, in memory only.
 

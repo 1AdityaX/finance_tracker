@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../data/ledger.dart';
 import '../data/money.dart';
 import '../data/spending.dart';
@@ -530,21 +532,29 @@ class PaymentFlow extends CommandFlow with _Creates {
       describe: (c) => 'in ${c.label}',
       selected: p?.billId ?? generalBill,
     );
-    expense = PickAsk(
-      'Which expense is it for?',
-      hint: 'Pick one to mark it paid, or leave it for the balance overall.',
-      choices: () => [
+    settle = SettleAsk(
+      'Which expenses is it for?',
+      hint:
+          'It pays them off in the order you tick them. Tick none to put it '
+          'toward the overall balance.',
+      expenses: () => [
         for (final (:expense, :open) in _openExpenses)
-          Choice(
-            expense.id,
-            expense.name,
-            detail: balancePhrase(open),
-            sign: open.sign,
+          (
+            choice: Choice(
+              expense.id,
+              expense.name,
+              detail: balancePhrase(open),
+              sign: open.sign,
+            ),
+            open: math.max(open * _owing, 0),
           ),
-        const Choice('', 'Not for a particular expense'),
       ],
-      describe: (c) => c.id.isEmpty ? 'any expense' : 'for ${c.label}',
-      selected: p?.expenseId ?? '',
+      amount: () => amount.paise ?? 0,
+      describe: (picked) =>
+          picked.isEmpty ? 'toward the balance' : 'for ${names(picked)}',
+      kept: p?.settles ?? const {},
+      keepWhile: () =>
+          friend.selected == p?.friendId && bill.selected == p?.billId,
     );
     date = p?.date ?? DateTime.now();
     if (friendId != null) preset = {friend};
@@ -555,7 +565,7 @@ class PaymentFlow extends CommandFlow with _Creates {
   late final AmountAsk amount;
   late final PickAsk friend;
   late final PickAsk bill;
-  late final PickAsk expense;
+  late final SettleAsk settle;
 
   @override
   Set<Ask> preset = const {};
@@ -573,18 +583,28 @@ class PaymentFlow extends CommandFlow with _Creates {
   Map<String, int> _billBalances(String friendId) =>
       _billCache[friendId] ??= _base.billBalances(friendId);
 
+  /// 1 when the friend pays you back, -1 when you pay them: the sign of an
+  /// expense balance this payment can lower.
+  int get _owing => direction == Direction.received ? 1 : -1;
+
   /// Expenses in the chosen bill that this payment can settle, newest first,
-  /// with what is still open on each. The expense a payment being edited is
-  /// linked to stays listed even when it is fully paid.
+  /// with what is still open on each. While its friend and bill stay the
+  /// same, a payment being edited keeps listing the expenses it pays toward,
+  /// even ones since paid off or moved to another bill.
   List<({Expense expense, int open})> get _openExpenses {
     final id = friend.selected;
     if (id == null) return const [];
     final open = _expenseBalances[id] ??= _base.expenseBalances(id);
-    final sign = direction == Direction.received ? 1 : -1;
+    final kept =
+        existing != null &&
+            id == existing!.friendId &&
+            bill.selected == existing!.billId
+        ? existing!.settles
+        : const <String, int>{};
     return [
       for (final e in _base.expenses.reversed)
-        if (e.billId == bill.selected &&
-            (open[e.id]! * sign > 0 || e.id == existing?.expenseId))
+        if (kept.containsKey(e.id) ||
+            (e.billId == bill.selected && open[e.id]! * _owing > 0))
           (expense: e, open: open[e.id]!),
     ];
   }
@@ -600,7 +620,7 @@ class PaymentFlow extends CommandFlow with _Creates {
   };
 
   @override
-  List<Ask> get asks => [amount, friend, bill, expense];
+  List<Ask> get asks => [amount, friend, bill, settle];
 
   @override
   String get saveLabel => editing
@@ -624,7 +644,7 @@ class PaymentFlow extends CommandFlow with _Creates {
     direction: direction,
     amount: amount.paise!,
     billId: bill.selected!,
-    expenseId: expense.selected!.isEmpty ? null : expense.selected,
+    settles: settle.settles,
     date: date!,
   );
 
@@ -652,7 +672,21 @@ class PaymentFlow extends CommandFlow with _Creates {
     final name = nameOf(id);
     final before = _base.balance(id);
     final after = save().balance(id);
+    final open = _expenseBalances[id] ??= _base.expenseBalances(id);
+    final payment = _payment;
     return [
+      [
+        for (final MapEntry(key: expense, value: part)
+            in payment.settles.entries)
+          if (open[expense]! * _owing - part case final left)
+            Line(
+              _base.expense(expense)!.name,
+              rupees(part),
+              detail: left > 0 ? '${rupees(left)} still open' : 'Paid in full',
+            ),
+        if (payment.settles.isNotEmpty && payment.unassigned > 0)
+          Line('Toward the overall balance', rupees(payment.unassigned)),
+      ],
       [
         Line('Before', balancePhrase(before, name: name), sign: before.sign),
         Line('After', balancePhrase(after, name: name), sign: after.sign),

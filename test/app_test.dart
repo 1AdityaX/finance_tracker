@@ -414,11 +414,16 @@ void main() {
     expect(find.text('owes you ₹600'), findsWidgets);
     await tester.tapText('Rahul');
     await tester.tapText('General');
-    expect(find.text('Which expense is it for?'), findsOneWidget);
-    await tester.tapText('Dinner');
+    expect(find.text('Which expenses is it for?'), findsOneWidget);
+    expect(find.text('All ₹600 goes toward the overall balance.'), findsOne);
+    await tester.tapText('Dinner'); // Ticking stays on the page.
+    expect(find.text('₹600, paid in full'), findsOneWidget);
+    expect(find.text('All ₹600 goes to these expenses.'), findsOneWidget);
+    await tester.next();
+    expect(find.text('Paid in full'), findsOneWidget);
     expect(find.text('settled up'), findsWidgets);
     await tester.tapText('Record ₹600 received');
-    expect(store.ledger.payments.single.expenseId, 'e1');
+    expect(store.ledger.payments.single.settles, {'e1': 60000});
     expect(store.ledger.balance('rahul'), 0);
     expect(find.text('You’re all settled up.'), findsOneWidget);
   });
@@ -449,6 +454,7 @@ void main() {
     await tester.tapText('Rahul');
     await tester.tapText('General');
     await tester.tapText('Dinner');
+    await tester.next();
     await tester.tapText('Record ₹600 sent');
     expect(store.ledger.balance('rahul'), 0);
     expect(find.text('₹600 to Rahul recorded'), findsOneWidget);
@@ -564,7 +570,7 @@ void main() {
     expect(find.text('Which bill is it for?'), findsOneWidget);
     expect(find.widgetWithText(ActionChip, 'from Rahul'), findsOneWidget);
     await tester.tapText('General');
-    await tester.tapText('Not for a particular expense');
+    await tester.next(); // Not for any expense in particular.
     await tester.tapText('Record ₹100 received');
     expect(store.ledger.balance('rahul'), 50000);
     expect(find.text('Rahul owes you ₹500.'), findsOneWidget);
@@ -903,5 +909,129 @@ void main() {
     await tester.tap(find.byTooltip('Next month'));
     await tester.pumpAndSettle();
     expect(find.text('Show all'), findsOneWidget);
+  });
+
+  testWidgets('one payment can pay off several expenses', (tester) async {
+    // Rahul owes ₹15 for a lollipop and ₹17.50 for nachos, and sends ₹31.
+    final store = await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [
+          expense(id: 'lolly', name: 'Lollipop', amount: 3000),
+          expense(id: 'nachos', name: 'Nachos', amount: 3500),
+        ],
+      ),
+    );
+    await tester.tapText('/receive');
+    await tester.type('31');
+    await tester.next();
+    await tester.tapText('Rahul');
+    await tester.tapText('General');
+    await tester.tapText('Lollipop');
+    await tester.tapText('Nachos');
+    // Ticked first, the lollipop is paid in full.
+    expect(find.text('1st · ₹15, paid in full'), findsOneWidget);
+    expect(find.text('2nd · ₹16 of ₹17.50, ₹1.50 left'), findsOneWidget);
+    await tester.next();
+
+    expect(
+      find.widgetWithText(ActionChip, 'for Lollipop and Nachos'),
+      findsOne,
+    );
+    expect(find.text('₹1.50 still open'), findsOneWidget);
+    await tester.tapText('Record ₹31 received');
+    expect(store.ledger.payments.single.settles, {
+      'lolly': 1500,
+      'nachos': 1600,
+    });
+    expect(store.ledger.balance('rahul'), 150);
+
+    await tester.tapText('Rahul');
+    expect(find.text('Rahul owes you ₹1.50.'), findsOneWidget);
+    expect(find.textContaining('for Lollipop and Nachos'), findsOneWidget);
+    expect(find.textContaining('₹1.50 left'), findsOneWidget);
+  });
+
+  testWidgets('a payment can’t continue with an expense it runs out before', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [
+          expense(id: 'lolly', name: 'Lollipop', amount: 3000),
+          expense(id: 'nachos', name: 'Nachos', amount: 3500),
+        ],
+      ),
+    );
+    await tester.tapText('/receive');
+    await tester.type('10');
+    await tester.next();
+    await tester.tapText('Rahul');
+    await tester.tapText('General');
+    await tester.tapText('Lollipop');
+    await tester.tapText('Nachos');
+    expect(find.text('2nd · Nothing left for this'), findsOneWidget);
+    await tester.next();
+    expect(find.text('Which expenses is it for?'), findsOneWidget);
+    expect(find.textContaining('is used up before Nachos'), findsOneWidget);
+  });
+
+  testWidgets('changing the bill from the review asks for expenses again', (
+    tester,
+  ) async {
+    await pumpApp(tester, ledgerWith(expenses: [expense()]));
+    await tester.tapText('/receive');
+    await tester.type('600');
+    await tester.next();
+    await tester.tapText('Rahul');
+    await tester.tapText('General');
+    await tester.tapText('Dinner');
+    await tester.next();
+    expect(find.text('Look right?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ActionChip, 'in General'));
+    await tester.pumpAndSettle();
+    await tester.tapText('Goa trip');
+    expect(find.text('Which expenses is it for?'), findsOneWidget);
+    await tester.next();
+    expect(find.widgetWithText(ActionChip, 'toward the balance'), findsOne);
+  });
+
+  testWidgets('a bill lists payments toward its expenses', (tester) async {
+    await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [expense(id: 'hotel', name: 'Hotel', billId: 'goa')],
+        // Recorded in General, but toward Goa trip's hotel.
+        payments: [payment(amount: 60000, expenseId: 'hotel')],
+      ),
+    );
+    await tester.tapText('Goa trip');
+    expect(find.text('Rahul sent you'), findsOneWidget);
+    expect(find.textContaining('for Hotel'), findsOneWidget);
+  });
+
+  testWidgets('back from the expenses page keeps the ticks', (tester) async {
+    final store = await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [expense()],
+        payments: [payment(amount: 60000, expenseId: 'e1')],
+      ),
+    );
+    await tester.tapText('Rahul sent you');
+    await tester.tap(find.widgetWithText(ActionChip, 'from Rahul'));
+    await tester.pumpAndSettle();
+    await tester.tapText('Priya');
+    expect(find.text('Which expenses is it for?'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await tester.tapText('Rahul');
+    await tester.next();
+    expect(find.widgetWithText(ActionChip, 'for Dinner'), findsOneWidget);
+    await tester.tapText('Change');
+    await tester.tapText('Cancel');
+    await tester.tapText('Save changes');
+    expect(store.ledger.payments.single.settles, {'e1': 60000});
   });
 }

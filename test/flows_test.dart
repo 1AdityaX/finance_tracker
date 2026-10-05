@@ -260,15 +260,207 @@ void main() {
       final flow = PaymentFlow(ledger, Direction.received)
         ..amount.paise = 60000
         ..friend.selected = 'rahul';
-      expect(flow.asks, contains(flow.expense));
-      flow.expense.selected = 'e1';
+      expect(flow.asks, contains(flow.settle));
+      flow.settle.selected.add('e1');
       final saved = flow.save();
       expect(saved.balance('rahul'), 0);
-      expect(saved.payments.single.expenseId, 'e1');
+      expect(saved.payments.single.settles, {'e1': 60000});
       expect(flow.review.expand((s) => s).map((l) => l.value), [
+        '₹600',
         'Rahul owes you ₹600',
         'settled up',
       ]);
+      expect(flow.review.first.single.detail, 'Paid in full');
+    });
+
+    /// Rahul owes ₹15 for a lollipop and ₹17.50 for nachos.
+    Ledger snacks() => ledgerWith(
+      expenses: [
+        expense(id: 'lolly', name: 'Lollipop', amount: 3000),
+        expense(id: 'nachos', name: 'Nachos', amount: 3500),
+      ],
+    );
+
+    test('one payment pays off several expenses, in the order ticked', () {
+      final flow = PaymentFlow(snacks(), Direction.received)
+        ..amount.paise = 3100
+        ..friend.selected = 'rahul';
+      flow.settle.selected.addAll(['lolly', 'nachos']);
+      expect(flow.settle.settles, {'lolly': 1500, 'nachos': 1600});
+      expect(flow.settle.phrase, 'for Lollipop and Nachos');
+      expect(flow.settle.problem, isNull);
+      expect(flow.save().balance('rahul'), 150);
+      expect(flow.save().expenseBalances('rahul'), {'lolly': 0, 'nachos': 150});
+      expect(flow.review.first.map((l) => (l.label, l.value, l.detail)), [
+        ('Lollipop', '₹15', 'Paid in full'),
+        ('Nachos', '₹16', '₹1.50 still open'),
+      ]);
+
+      flow.settle.selected
+        ..clear()
+        ..addAll(['nachos', 'lolly']);
+      expect(flow.settle.settles, {'nachos': 1750, 'lolly': 1350});
+    });
+
+    test('what the expenses don’t take goes toward the balance', () {
+      final flow = PaymentFlow(snacks(), Direction.received)
+        ..amount.paise = 4000
+        ..friend.selected = 'rahul';
+      flow.settle.selected.addAll(['lolly', 'nachos']);
+      expect(flow.settle.leftOver, 750);
+      expect(flow.save().payments.single.unassigned, 750);
+      expect(flow.review.first.last.label, 'Toward the overall balance');
+      expect(flow.save().balance('rahul'), -750);
+    });
+
+    test('editing keeps a payment’s split even after its expenses change', () {
+      // Paid ₹31 as ₹15 + ₹16; then the lollipop turns out to be ₹80.
+      final paid = payment(
+        amount: 3100,
+        settles: {'lolly': 1500, 'nachos': 1600},
+      );
+      final ledger = snacks()
+          .put(
+            expense: expense(id: 'lolly', name: 'Lollipop', amount: 8000),
+          )
+          .put(payment: paid);
+      final flow = PaymentFlow(ledger, Direction.received, existing: paid);
+      expect(flow.settle.settles, paid.settles);
+      expect(flow.settle.problem, isNull);
+      expect(flow.save().payment('p1')!.settles, paid.settles);
+
+      // A new amount splits it again, by what is open now.
+      flow.amount.paise = 3000;
+      expect(flow.settle.settles, {'lolly': 3000, 'nachos': 0});
+      expect(flow.settle.problem, startsWith('₹30 is used up before Nachos'));
+    });
+
+    test('an old payment wholly on one expense can be split again', () {
+      // Saved before payments could pay toward several expenses.
+      final old = payment(amount: 3100, expenseId: 'lolly');
+      final flow = PaymentFlow(
+        snacks().put(payment: old),
+        Direction.received,
+        existing: old,
+      );
+      expect(flow.settle.settles, {'lolly': 3100});
+      flow.settle.selected.add('nachos');
+      expect(flow.settle.settles, {'lolly': 1500, 'nachos': 1600});
+      expect(flow.settle.problem, isNull);
+    });
+
+    test('a new friend or bill asks for the expenses again', () {
+      final flow = PaymentFlow(snacks(), Direction.received)
+        ..amount.paise = 3100
+        ..friend.selected = 'rahul';
+      flow.settle.selected.addAll(['lolly', 'nachos']);
+      flow.settle.accept();
+      expect(flow.settle.stale, isFalse);
+      flow.bill.selected = 'goa';
+      expect(flow.settle.stale, isTrue);
+      flow.settle.accept();
+      expect(flow.settle.settles, isEmpty, reason: 'none of Goa’s');
+
+      // Back in General, the ticks still hold.
+      flow.bill.selected = generalBill;
+      expect(flow.settle.stale, isTrue);
+      expect(flow.settle.settles, {'lolly': 1500, 'nachos': 1600});
+    });
+
+    test('editing for another friend splits by their share', () {
+      // Dinner split by amount: Rahul ₹700, Priya ₹300.
+      final dinner = expense(
+        split: SplitMode.exact,
+        parts: {me: 20000, 'rahul': 70000, 'priya': 30000},
+      );
+      final paid = payment(amount: 70000, expenseId: 'e1');
+      final flow = PaymentFlow(
+        ledgerWith(expenses: [dinner], payments: [paid]),
+        Direction.received,
+        existing: paid,
+      )..friend.selected = 'priya';
+      expect(flow.settle.stale, isTrue);
+      expect(flow.settle.settles, {'e1': 30000});
+      expect(flow.settle.leftOver, 40000);
+      flow.friend.selected = 'rahul';
+      expect(flow.settle.settles, {'e1': 70000});
+    });
+
+    test('an edit toward the balance notices a new friend after ticks', () {
+      final paid = payment(amount: 3100);
+      final flow = PaymentFlow(
+        snacks().put(payment: paid),
+        Direction.received,
+        existing: paid,
+      );
+      flow.settle.selected.add('lolly');
+      expect(flow.settle.stale, isFalse);
+      flow.friend.selected = 'priya';
+      expect(flow.settle.stale, isTrue);
+    });
+
+    test('a tick left with another friend doesn’t break the kept split', () {
+      final paid = payment(
+        amount: 3100,
+        settles: {'lolly': 1500, 'nachos': 1600},
+      );
+      final ledger = snacks()
+          .put(
+            expense: expense(id: 'lolly', name: 'Lollipop', amount: 8000),
+          )
+          .put(
+            expense: expense(
+              id: 'chips',
+              name: 'Chips',
+              parts: {me: 1, 'priya': 1},
+            ),
+          )
+          .put(payment: paid);
+      final flow = PaymentFlow(ledger, Direction.received, existing: paid)
+        ..friend.selected = 'priya';
+      flow.settle.selected.add('chips');
+      flow.friend.selected = 'rahul';
+      expect(flow.settle.settles, paid.settles);
+      expect(flow.settle.problem, isNull);
+    });
+
+    test('with no amount, only the amount question complains', () {
+      final flow = PaymentFlow(snacks(), Direction.received)
+        ..friend.selected = 'rahul';
+      flow.settle.selected.add('lolly');
+      expect(flow.settle.problem, isNull);
+      flow.amount.paise = 100;
+      expect(flow.settle.problem, isNull);
+    });
+
+    test('editing a payment for another friend drops its expenses', () {
+      final paid = payment(
+        amount: 3100,
+        settles: {'lolly': 1500, 'nachos': 1600},
+      );
+      final flow = PaymentFlow(
+        snacks().put(payment: paid),
+        Direction.received,
+        existing: paid,
+      )..friend.selected = 'priya';
+      expect(flow.settle.expenses(), isEmpty);
+      expect(flow.settle.stale, isTrue);
+      expect(flow.settle.settles, isEmpty);
+      expect(flow.settle.phrase, 'toward the balance');
+    });
+
+    test('an expense the money runs out before is a problem', () {
+      final flow = PaymentFlow(snacks(), Direction.received)
+        ..amount.paise = 1000
+        ..friend.selected = 'rahul';
+      flow.settle.selected.addAll(['lolly', 'nachos']);
+      expect(
+        flow.settle.problem,
+        '₹10 is used up before Nachos. Untick it, or tick it before the '
+        'others.',
+      );
+      flow.settle.selected.remove('nachos');
+      expect(flow.settle.problem, isNull);
     });
 
     test('only lists expenses this payment can settle', () {
@@ -281,28 +473,26 @@ void main() {
       );
       final received = PaymentFlow(ledger, Direction.received)
         ..friend.selected = 'rahul';
-      expect(received.expense.choices().map((c) => c.label), [
-        'Dinner',
-        'Not for a particular expense',
-      ]);
+      List<String> labels(PaymentFlow flow) => [
+        for (final e in flow.settle.expenses()) e.choice.label,
+      ];
+      expect(labels(received), ['Dinner']);
       final sent = PaymentFlow(ledger, Direction.sent)
         ..friend.selected = 'rahul';
-      expect(sent.expense.choices().first.label, 'Cab');
+      expect(labels(sent), ['Cab']);
       received.bill.selected = 'goa';
-      expect(received.expense.choices().first.label, 'Goa hotel');
+      expect(labels(received), ['Goa hotel']);
     });
 
     test('always asks for the expense, with none picked by default', () {
       final flow = PaymentFlow(ledgerWith(), Direction.sent)
         ..amount.paise = 10000
         ..friend.selected = 'rahul';
-      expect(flow.asks, [flow.amount, flow.friend, flow.bill, flow.expense]);
-      expect(
-        flow.expense.choices().single.label,
-        'Not for a particular expense',
-      );
-      expect(flow.expense.problem, isNull);
-      expect(flow.save().payments.single.expenseId, isNull);
+      expect(flow.asks, [flow.amount, flow.friend, flow.bill, flow.settle]);
+      expect(flow.settle.expenses(), isEmpty);
+      expect(flow.settle.problem, isNull);
+      expect(flow.settle.phrase, 'toward the balance');
+      expect(flow.save().payments.single.settles, isEmpty);
       expect(flow.save().balance('rahul'), 10000);
     });
 
@@ -314,8 +504,8 @@ void main() {
         Direction.received,
         existing: p2,
       );
-      expect(flow.expense.problem, isNull);
-      expect(flow.save().payment('p2')!.expenseId, 'e1');
+      expect(flow.settle.problem, isNull);
+      expect(flow.save().payment('p2')!.settles, {'e1': 10000});
     });
 
     test('a friend preset skips the friend question', () {
@@ -330,9 +520,9 @@ void main() {
         Direction.received,
         existing: p,
       );
-      expect(flow.asks, contains(flow.expense));
-      expect(flow.expense.selected, 'e1');
-      expect(flow.review.first.first.value, 'Rahul owes you ₹600');
+      expect(flow.asks, contains(flow.settle));
+      expect(flow.settle.selected, ['e1']);
+      expect(flow.review.last.first.value, 'Rahul owes you ₹600');
       expect(flow.delete()!.ledger.payments, isEmpty);
     });
   });

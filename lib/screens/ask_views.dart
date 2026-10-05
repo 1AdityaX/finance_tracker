@@ -65,6 +65,7 @@ class AskView extends StatelessWidget {
     final PickAsk a => _PickView(a, onChanged, onDone),
     final MultiPickAsk a => _MultiPickView(a, onChanged, onDone),
     final SplitAsk a => _SplitView(a, onChanged),
+    final SettleAsk a => _SettleView(a, onChanged, onDone),
   };
 }
 
@@ -376,14 +377,17 @@ mixin _Filtering<T extends StatefulWidget> on State<T> {
       !choices.any((c) => c.label.toLowerCase() == typed.toLowerCase());
 
   /// The question, a search field when useful, a row that creates what was
-  /// typed, and the matching choices drawn by [tile].
+  /// typed, an optional [status] line, and the matching choices drawn by
+  /// [tile]. [empty] replaces the note shown when there are no choices.
   Widget choiceList(
     Ask ask,
     List<Choice> choices,
     Creator? creator, {
     required VoidCallback onSubmitted,
-    required VoidCallback onCreate,
+    VoidCallback? onCreate,
     required Widget Function(Choice choice) tile,
+    Widget? status,
+    String? empty,
   }) {
     final visible = filter(choices);
     final create = canCreate(creator, choices);
@@ -409,11 +413,13 @@ mixin _Filtering<T extends StatefulWidget> on State<T> {
               onTap: onCreate,
             ),
           ),
+        if (status != null) SliverToBoxAdapter(child: status),
         SliverList.list(children: [for (final c in visible) tile(c)]),
         if (visible.isEmpty && !create)
           SliverToBoxAdapter(
             child: EmptyNote(switch ((choices.isEmpty, ask.problem)) {
               (false, _) => 'Nothing matches “$typed”.',
+              (true, _) when empty != null => empty,
               (true, null) =>
                 'Nothing here yet. Type a name above to add one, or '
                     'continue without.',
@@ -542,6 +548,132 @@ class _MultiPickViewState extends State<_MultiPickView> with _Filtering {
         onChanged: (_) => _toggle(c.id),
         secondary: Avatar(c.label),
         title: Text(c.label),
+      ),
+    );
+  }
+}
+
+class _SettleView extends StatefulWidget {
+  const _SettleView(this.ask, this.onChanged, this.onDone);
+  final SettleAsk ask;
+  final VoidCallback onChanged;
+  final VoidCallback onDone;
+
+  @override
+  State<_SettleView> createState() => _SettleViewState();
+}
+
+class _SettleViewState extends State<_SettleView> with _Filtering {
+  SettleAsk get ask => widget.ask;
+
+  void _toggle(String id) {
+    ask.selected.contains(id) ? ask.selected.remove(id) : ask.selected.add(id);
+    widget.onChanged();
+  }
+
+  /// Enter ticks the only match; with nothing typed it moves on.
+  void _submit() {
+    final visible = filter([for (final e in ask.expenses()) e.choice]);
+    if (typed.isEmpty) {
+      if (ask.problem == null) widget.onDone();
+    } else if (visible.length == 1) {
+      if (!ask.selected.contains(visible.single.id)) {
+        ask.selected.add(visible.single.id);
+      }
+      query.clear();
+      widget.onChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final expenses = ask.expenses();
+    final open = {for (final e in expenses) e.choice.id: e.open};
+    final settles = ask.settles;
+    final order = settles.keys.toList();
+    return choiceList(
+      ask,
+      [for (final e in expenses) e.choice],
+      null,
+      onSubmitted: _submit,
+      status: expenses.isEmpty ? null : _status(theme),
+      empty:
+          'Nothing is open with them in this bill. Continue to put it '
+          'toward the overall balance.',
+      tile: (c) {
+        final part = settles[c.id];
+        final left = open[c.id]!;
+        // With two or more ticked, the order decides what is paid in full.
+        final turn = order.length > 1 && part != null
+            ? '${_ordinal(order.indexOf(c.id) + 1)} · '
+            : '';
+        return CheckboxListTile(
+          value: part != null,
+          onChanged: (_) => _toggle(c.id),
+          title: Text(c.label),
+          subtitle: Text(
+            switch (part) {
+              null => c.detail ?? '',
+              0 when left == 0 => '${turn}Already paid',
+              0 => '${turn}Nothing left for this',
+              _ when part >= left => '$turn${rupees(part)}, paid in full',
+              _ =>
+                '$turn${rupees(part)} of ${rupees(left)}, '
+                    '${rupees(left - part)} left',
+            },
+            style: TextStyle(
+              color: switch (part) {
+                null => scheme.forSign(c.sign),
+                0 => scheme.forSign(-1),
+                _ => null,
+              },
+              fontFeatures: tabular,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// "1st", "2nd", "3rd", "4th", "11th", "21st".
+  static String _ordinal(int n) => switch ((n % 10, n % 100)) {
+    (_, 11 || 12 || 13) => '${n}th',
+    (1, _) => '${n}st',
+    (2, _) => '${n}nd',
+    (3, _) => '${n}rd',
+    _ => '${n}th',
+  };
+
+  /// Where the money goes: "₹1.50 left over goes toward the overall
+  /// balance". A problem shows above Continue instead, where it can't
+  /// scroll away.
+  Widget? _status(ThemeData theme) {
+    if (ask.problem != null) return null;
+    final amount = rupees(ask.amount());
+    final (String text, int sign) = switch (ask.leftOver) {
+      _ when ask.settles.isEmpty => (
+        'All $amount goes toward the overall balance.',
+        0,
+      ),
+      final left when left > 0 => (
+        '${rupees(left)} left over goes toward the overall balance.',
+        0,
+      ),
+      _ => ('All $amount goes to these expenses.', 1),
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Semantics(
+        liveRegion: true,
+        child: Text(
+          text,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.forSign(sign),
+            fontFeatures: tabular,
+          ),
+        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../data/ledger.dart';
 import '../data/money.dart';
 
@@ -313,4 +315,131 @@ final class SplitAsk extends Ask {
     SplitMode.percent => 'split by percentage',
     SplitMode.exact => 'split by amount',
   };
+}
+
+/// The expenses a payment pays toward. The amount goes to them in the order
+/// they were ticked, each taking up to what is still open on it; anything
+/// left over counts toward the balance overall.
+final class SettleAsk extends Ask {
+  SettleAsk(
+    super.question, {
+    super.hint,
+    required this.expenses,
+    required this.amount,
+    required this.describe,
+    Map<String, int> kept = const {},
+    bool Function()? keepWhile,
+  }) : _kept = kept,
+       _keepWhile = keepWhile ?? (() => true),
+       selected = [...kept.keys] {
+    _keptAmount = amount();
+    // An edit starts on its review with every page confirmed, so it needs
+    // this listing to notice a new friend or bill.
+    accept();
+  }
+
+  /// Each expense it can pay toward, with what is still open on it, in
+  /// paise. That is the most it can take.
+  final List<({Choice choice, int open})> Function() expenses;
+
+  /// The payment, in paise.
+  final int Function() amount;
+
+  /// Turns the names of the ticked expenses, in order, into the strip
+  /// phrase. Gets an empty list when none are ticked.
+  final String Function(List<String> names) describe;
+
+  /// In the order they were ticked.
+  final List<String> selected;
+
+  /// What a payment being edited already put toward each expense. It stays
+  /// as it was while the ticks, the amount and [_keepWhile] do, so opening a
+  /// payment never moves its money, even after its expenses change.
+  final Map<String, int> _kept;
+  late final int _keptAmount;
+
+  /// Whether the payment is still between the same people in the same bill,
+  /// so its kept parts still apply.
+  final bool Function() _keepWhile;
+
+  Map<String, int> get _open => {
+    for (final e in expenses()) e.choice.id: e.open,
+  };
+
+  /// What goes to each ticked expense, in the order ticked.
+  Map<String, int> get settles {
+    final open = _open;
+    if (_kept.isNotEmpty &&
+        _keepWhile() &&
+        amount() == _keptAmount &&
+        // Ticks on expenses not listed now don't count.
+        _sameOrder([
+          for (final id in selected)
+            if (open.containsKey(id)) id,
+        ], _kept.keys) &&
+        _kept.keys.every(open.containsKey)) {
+      return {..._kept};
+    }
+    var left = amount();
+    final settles = <String, int>{};
+    for (final id in selected) {
+      if (open[id] case final cap?) {
+        final part = math.min(left, cap);
+        settles[id] = part;
+        left -= part;
+      }
+    }
+    return settles;
+  }
+
+  static bool _sameOrder(List<String> a, Iterable<String> b) {
+    final list = b.toList();
+    if (a.length != list.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != list[i]) return false;
+    }
+    return true;
+  }
+
+  /// What is left once the ticked expenses take their part.
+  int get leftOver =>
+      settles.values.fold(amount(), (left, part) => left - part);
+
+  String _name(String id) =>
+      expenses().firstWhere((e) => e.choice.id == id).choice.label;
+
+  @override
+  String? get problem {
+    // With no amount yet, the amount question says what's wrong.
+    if (amount() <= 0) return null;
+    final open = _open;
+    for (final MapEntry(key: id, value: part) in settles.entries) {
+      if (part > 0) continue;
+      return open[id] == 0
+          ? '${_name(id)} is already paid. Untick it.'
+          : '${rupees(amount())} is used up before ${_name(id)}. Untick it, '
+                'or tick it before the others.';
+    }
+    return null;
+  }
+
+  /// The expenses listed, and what was open on each, when this page was
+  /// last accepted. Ticks on expenses no longer listed are kept but don't
+  /// count, so they come back if the friend or bill changes back.
+  String? _acceptedFor;
+  String get _listing => [
+    for (final MapEntry(:key, :value) in _open.entries) '$key:$value',
+  ].join('|');
+
+  /// With something ticked, a new friend or bill means a new list of
+  /// expenses to look at.
+  @override
+  bool get stale =>
+      selected.isNotEmpty && _acceptedFor != null && _acceptedFor != _listing;
+
+  @override
+  void accept() => _acceptedFor = _listing;
+
+  @override
+  String get phrase => describe([for (final id in settles.keys) _name(id)]);
 }

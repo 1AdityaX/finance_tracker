@@ -159,7 +159,7 @@ class Payment {
     required this.direction,
     required this.amount,
     required this.billId,
-    required this.expenseId,
+    this.settles = const {},
     required this.date,
   });
   final String id;
@@ -168,8 +168,10 @@ class Payment {
   final int amount;
   final String billId;
 
-  /// The expense this payment settles, if the user picked one.
-  final String? expenseId;
+  /// The expenses this payment pays toward, in the order they were picked,
+  /// with how much of [amount] goes to each, in paise. The rest counts
+  /// toward the balance overall.
+  final Map<String, int> settles;
   final DateTime date;
 
   /// How this payment moves what the friend owes you.
@@ -177,13 +179,17 @@ class Payment {
   /// Money received means they owe less. Money sent means you owe less.
   int get effect => direction == Direction.received ? -amount : amount;
 
+  /// The part of [amount] not put toward any expense.
+  int get unassigned =>
+      settles.values.fold(amount, (left, part) => left - part);
+
   Map<String, Object?> toJson() => {
     'id': id,
     'friend': friendId,
     'direction': direction.name,
     'amount': amount,
     'bill': billId,
-    'expense': expenseId,
+    'settles': settles,
     'date': date.toIso8601String(),
   };
   factory Payment.fromJson(Map<String, Object?> json) => Payment(
@@ -192,7 +198,13 @@ class Payment {
     direction: Direction.values.byName(json['direction']! as String),
     amount: json['amount']! as int,
     billId: json['bill']! as String,
-    expenseId: json['expense'] as String?,
+    settles: switch (json) {
+      {'settles': final Map<Object?, Object?> settles} =>
+        settles.cast<String, int>(),
+      // Until version 4, a payment went wholly to the one expense it named.
+      {'expense': final String expense} => {expense: json['amount']! as int},
+      _ => const {},
+    },
     date: DateTime.parse(json['date']! as String),
   );
 }
@@ -244,11 +256,13 @@ class Ledger {
         total += e.owedBy(friendId);
       }
     }
-    for (final p in payments) {
-      if (p.friendId == friendId &&
-          (billId == null || p.billId == billId) &&
-          (expenseId == null || p.expenseId == expenseId)) {
-        total += p.effect;
+    final billOf = _billOf;
+    for (final p in payments.where((p) => p.friendId == friendId)) {
+      for (final part in _parts(p, billOf)) {
+        if ((billId == null || part.billId == billId) &&
+            (expenseId == null || part.expenseId == expenseId)) {
+          total += part.effect;
+        }
       }
     }
     return total;
@@ -267,8 +281,13 @@ class Ledger {
         if (id != me) add(id, e.owedBy(id));
       }
     }
+    final billOf = _billOf;
     for (final p in payments) {
-      if (billId == null || p.billId == billId) add(p.friendId, p.effect);
+      for (final part in _parts(p, billOf)) {
+        if (billId == null || part.billId == billId) {
+          add(p.friendId, part.effect);
+        }
+      }
     }
     return totals;
   }
@@ -278,9 +297,9 @@ class Ledger {
   /// records, for lists of expenses.
   Map<String, int> expenseBalances(String friendId) {
     final open = {for (final e in expenses) e.id: e.owedBy(friendId)};
-    for (final p in payments) {
-      if (p.friendId == friendId && open.containsKey(p.expenseId)) {
-        open[p.expenseId!] = open[p.expenseId]! + p.effect;
+    for (final p in payments.where((p) => p.friendId == friendId)) {
+      for (final MapEntry(key: id, value: part) in p.settles.entries) {
+        if (open[id] case final left?) open[id] = left + part * p.effect.sign;
       }
     }
     return open;
@@ -292,12 +311,36 @@ class Ledger {
     for (final e in expenses) {
       totals[e.billId] = (totals[e.billId] ?? 0) + e.owedBy(friendId);
     }
-    for (final p in payments) {
-      if (p.friendId == friendId) {
-        totals[p.billId] = (totals[p.billId] ?? 0) + p.effect;
+    final billOf = _billOf;
+    for (final p in payments.where((p) => p.friendId == friendId)) {
+      for (final part in _parts(p, billOf)) {
+        totals[part.billId] = (totals[part.billId] ?? 0) + part.effect;
       }
     }
     return totals;
+  }
+
+  /// Each expense's bill, by expense id.
+  Map<String, String> get _billOf => {for (final e in expenses) e.id: e.billId};
+
+  /// How [p] moves balances, piece by piece: what it put toward each
+  /// expense counts in that expense's bill, and the rest in the payment's
+  /// own bill. Signed like [Payment.effect].
+  static Iterable<({String billId, String? expenseId, int effect})> _parts(
+    Payment p,
+    Map<String, String> billOf,
+  ) sync* {
+    final sign = p.effect.sign;
+    for (final MapEntry(key: id, value: part) in p.settles.entries) {
+      yield (
+        billId: billOf[id] ?? p.billId,
+        expenseId: id,
+        effect: part * sign,
+      );
+    }
+    if (p.unassigned != 0) {
+      yield (billId: p.billId, expenseId: null, effect: p.unassigned * sign);
+    }
   }
 
   /// Friends you dealt with most recently first, then the rest by name.
@@ -371,8 +414,10 @@ class Ledger {
       ) ||
       payments.any((p) => p.friendId == friendId);
 
-  /// Adds or replaces records by id. Payments for an expense follow it when
-  /// it moves to another bill, so per-bill balances stay right.
+  /// Adds or replaces records by id. A payment that went wholly to expenses
+  /// that are now all in another bill follows them there, so it is listed
+  /// where its money counts. (Money put toward an expense always counts in
+  /// that expense's bill; any rest stays in the payment's.)
   Ledger put({
     Friend? friend,
     Bill? bill,
@@ -381,11 +426,16 @@ class Ledger {
     Payment? payment,
   }) {
     var next = _put(payments, payment, (p) => p.id);
-    if (expense != null) {
+    final old = expenses.where((e) => e.id == expense?.id).firstOrNull;
+    if (expense != null && old != null && old.billId != expense.billId) {
+      final billOf = {..._billOf, expense.id: expense.billId};
       next = [
         for (final p in next)
-          p.expenseId == expense.id && p.billId != expense.billId
-              ? _relink(p, billId: expense.billId, expenseId: expense.id)
+          p.billId == old.billId &&
+                  p.unassigned == 0 &&
+                  p.settles.containsKey(expense.id) &&
+                  p.settles.keys.every((id) => billOf[id] == expense.billId)
+              ? _relink(p, billId: expense.billId)
               : p,
       ];
     }
@@ -404,12 +454,22 @@ class Ledger {
   /// Removes a bill and its expenses. Its payments still count, under General.
   Ledger removeBill(String id) {
     assert(id != generalBill, 'The General bill cannot be removed.');
+    final gone = {
+      for (final e in expenses)
+        if (e.billId == id) e.id,
+    };
     return _copy(
       bills: bills.where((b) => b.id != id).toList(),
       expenses: expenses.where((e) => e.billId != id).toList(),
       payments: [
         for (final p in payments)
-          p.billId == id ? _relink(p, billId: generalBill) : p,
+          p.billId == id || p.settles.keys.any(gone.contains)
+              ? _relink(
+                  p,
+                  billId: p.billId == id ? generalBill : p.billId,
+                  drop: gone,
+                )
+              : p,
       ],
     );
   }
@@ -419,7 +479,9 @@ class Ledger {
     expenses: expenses.where((e) => e.id != id).toList(),
     payments: [
       for (final p in payments)
-        p.expenseId == id ? _relink(p, billId: p.billId) : p,
+        p.settles.containsKey(id)
+            ? _relink(p, billId: p.billId, drop: {id})
+            : p,
     ],
   );
 
@@ -461,17 +523,21 @@ class Ledger {
     categories: categories ?? this.categories,
   );
 
+  /// [p] in [billId], no longer paying toward the expenses in [drop].
   static Payment _relink(
     Payment p, {
     required String billId,
-    String? expenseId,
+    Set<String> drop = const {},
   }) => Payment(
     id: p.id,
     friendId: p.friendId,
     direction: p.direction,
     amount: p.amount,
     billId: billId,
-    expenseId: expenseId,
+    settles: {
+      for (final MapEntry(:key, :value) in p.settles.entries)
+        if (!drop.contains(key)) key: value,
+    },
     date: p.date,
   );
 
@@ -484,8 +550,9 @@ class Ledger {
         : [...items.take(index), item, ...items.skip(index + 1)];
   }
 
-  /// Version 3 added categories.
-  static const version = 3;
+  /// Version 3 added categories; version 4 lets a payment pay toward
+  /// several expenses.
+  static const version = 4;
 
   Map<String, Object?> toJson() => {
     'version': version,

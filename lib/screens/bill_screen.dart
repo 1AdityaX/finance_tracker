@@ -31,7 +31,14 @@ class BillScreen extends StatelessWidget {
     builder: (context, ledger, bill) {
       final theme = Theme.of(context);
       final expenses = ledger.expenses.where((e) => e.billId == bill.id);
-      final payments = ledger.payments.where((p) => p.billId == bill.id);
+      // A payment shows where any of its money counts: toward an expense
+      // here, or not toward any expense in a payment made in this bill.
+      final ids = {for (final e in expenses) e.id};
+      final payments = ledger.payments.where(
+        (p) =>
+            p.settles.keys.any(ids.contains) ||
+            (p.billId == bill.id && p.unassigned != 0),
+      );
       final total = expenses.fold(0, (sum, e) => sum + e.amount);
       final inBill = ledger.balances(billId: bill.id);
       final balances = [

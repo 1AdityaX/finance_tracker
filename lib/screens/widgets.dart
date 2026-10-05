@@ -209,7 +209,7 @@ class ActivityList extends StatelessWidget {
     final ledger = store.ledger;
     final bills = {for (final b in ledger.bills) b.id: b.name};
     final categories = {for (final c in ledger.categories) c.id: c.name};
-    final names = {for (final e in ledger.expenses) e.id: e.name};
+    final expenseNames = {for (final e in ledger.expenses) e.id: e.name};
     return SliverList.builder(
       itemCount: limit == null ? rows.length : rows.length.clamp(0, limit!),
       itemBuilder: (context, i) {
@@ -224,7 +224,9 @@ class ActivityList extends StatelessWidget {
           );
         }
         final p = row.payment!;
-        return _paymentTile(context, p, bills[p.billId], names[p.expenseId]);
+        return _paymentTile(context, p, bills[p.billId], [
+          for (final id in p.settles.keys) ?expenseNames[id],
+        ]);
       },
     );
   }
@@ -280,7 +282,7 @@ class ActivityList extends StatelessWidget {
     BuildContext context,
     Payment p,
     String? bill,
-    String? expense,
+    List<String> expenses,
   ) {
     final name = store.ledger.nameOf(p.friendId);
     final sent = p.direction == Direction.sent;
@@ -293,8 +295,8 @@ class ActivityList extends StatelessWidget {
       ),
       subtitle: Text(
         [
-          if (expense != null) 'for $expense',
-          if (showBill && expense == null) 'in ${bill ?? 'General'}',
+          if (expenses.isNotEmpty) 'for ${names(expenses)}',
+          if (showBill && expenses.isEmpty) 'in ${bill ?? 'General'}',
           shortDate(p.date),
         ].join(' · '),
       ),
