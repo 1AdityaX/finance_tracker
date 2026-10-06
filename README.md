@@ -17,6 +17,7 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 | `/bill` | What's it called? |
 | `/friend` | What's their name? |
 | `/category` | What's it called? · Count it in your spending? |
+| `/categories` | Opens the list of categories |
 | `/spending` | Opens monthly spending |
 | `/undo` | Reverts the last change |
 
@@ -40,7 +41,7 @@ Tap an expense or payment to open its review card, where you can edit an answer 
 
 Spending is your share of each expense. Money you paid for friends is what they owe you, not spending, and payments between people never count.
 
-There are no preset categories. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed or deleted. Deleting a category leaves its expenses uncategorised.
+There are no preset categories. Add them with `/category`, or by typing a name on the category question. Categories are listed on home and with `/categories`; each has a page with what it cost this month and in all, its expenses, an Add expense button that fills the category in, and Edit and Delete in its menu. Deleting a category leaves its expenses uncategorised.
 
 A category can be excluded from spending by answering "No, leave it out" to "Count it in your spending?". Use this for large costs someone else paid for, like college fees. Its expenses are listed under "Not counted in spending" and the month's summary adds "Plus ₹1,00,000 not counted".
 
@@ -93,7 +94,8 @@ lib/
     friend_screen.dart   One friend's balance and history
     bill_screen.dart     One bill's expenses and balances
     spending_screen.dart A month of spending: total, comparison, bars, expenses
-    categories_screen.dart  Adding, renaming and deleting categories
+    categories_screen.dart  The list of categories
+    category_screen.dart One category: its expenses, editing and deleting it
     backup.dart          The "Back up to Google" row and signing in
     widgets.dart         Shared rows, labels, and the undo snackbar
 test/                    Unit tests for data, sync and flows, widget tests for every flow

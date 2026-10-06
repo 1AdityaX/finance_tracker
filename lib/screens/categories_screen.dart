@@ -1,30 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../data/ledger.dart';
 import '../data/store.dart';
 import '../flows/flows.dart';
+import 'category_screen.dart';
 import 'widgets.dart';
 
-/// Your categories, to add, rename and delete.
+/// Every category, each opening its own page.
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key, required this.store});
   final Store store;
-
-  Future<void> _delete(BuildContext context, Category category) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final used = store.ledger.expenses.where(
-      (e) => e.categoryId == category.id,
-    );
-    final message = switch (used.length) {
-      0 => '“${category.name}” deleted',
-      1 => '“${category.name}” deleted. Its expense now has no category.',
-      final n =>
-        '“${category.name}” deleted. Its $n expenses now have no '
-            'category.',
-    };
-    await store.save(store.ledger.removeCategory(category.id), message);
-    showUndo(messenger, store, message);
-  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -47,8 +31,8 @@ class CategoriesScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
               child: Text(
                 'Give an expense a category when you add it, to see where '
-                'your money goes. Tap a category to rename it, or to leave it '
-                'out of your spending.',
+                'your money goes. Tap a category to see its expenses, edit it '
+                'or delete it.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -80,15 +64,11 @@ class CategoriesScreen extends StatelessWidget {
                     if (!category.counted) 'not counted in spending',
                   ].join(' · '),
                 ),
-                trailing: IconButton(
-                  tooltip: 'Delete ${category.name}',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _delete(context, category),
-                ),
-                onTap: () => startFlow(
-                  context,
-                  store,
-                  CategoryFlow(store.ledger, existing: category),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CategoryScreen(store: store, categoryId: category.id),
+                  ),
                 ),
               ),
           ],

@@ -287,7 +287,12 @@ mixin _Creates on CommandFlow {
 }
 
 class ExpenseFlow extends CommandFlow with _Creates {
-  ExpenseFlow(super.ledger, {this.existing, String? billId}) {
+  ExpenseFlow(
+    super.ledger, {
+    this.existing,
+    String? billId,
+    String? categoryId,
+  }) {
     final e = existing;
     name = TextAsk(
       'What was it for?',
@@ -302,7 +307,7 @@ class ExpenseFlow extends CommandFlow with _Creates {
         const Choice('', CategoryFlow.noCategory),
       ],
       describe: (c) => c.id.isEmpty ? 'no category' : c.label,
-      selected: e?.categoryId ?? '',
+      selected: e?.categoryId ?? categoryId ?? '',
       creator: categoryCreator,
     );
     bill = PickAsk(
@@ -358,7 +363,7 @@ class ExpenseFlow extends CommandFlow with _Creates {
     );
     date = e?.date ?? DateTime.now();
     // Started from a bill's page, the bill is already known.
-    if (billId != null) preset = {bill};
+    preset = {if (billId != null) bill, if (categoryId != null) category};
   }
 
   final Expense? existing;

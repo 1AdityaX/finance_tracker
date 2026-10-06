@@ -848,16 +848,23 @@ void main() {
     await tester.tapText('Yes, count it'); // Picking saves.
     expect(store.ledger.categories.map((c) => c.name), contains('Food'));
 
+    // Each category has its own page, with edit and delete in its menu.
     await tester.tapText('Travel');
+    expect(find.text('1 expense'), findsNothing);
+    expect(find.textContaining('in all, 1 expense'), findsOneWidget);
+    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
+    await tester.pumpAndSettle();
+    await tester.tapText('Edit');
     await tester.type('Trips');
     await tester.next();
     await tester.tapText('No, leave it out');
     expect(store.ledger.category('travel')!.name, 'Trips');
     expect(store.ledger.category('travel')!.counted, isFalse);
-    expect(find.textContaining('not counted in spending'), findsOneWidget);
+    expect(find.textContaining('not counted in your spending'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Delete Trips'));
+    await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
     await tester.pumpAndSettle();
+    await tester.tapText('Delete category');
     expect(
       find.text('“Trips” deleted. Its expense now has no category.'),
       findsOneWidget,
@@ -1192,6 +1199,41 @@ void main() {
     await tester.reveal(find.text('Money in'));
     await tester.reveal(find.text('Mom gave you'));
     expect(find.textContaining('College fees'), findsWidgets);
+  });
+
+  testWidgets('home lists categories, each with its own page', (tester) async {
+    final store = await pumpApp(
+      tester,
+      ledgerWith(expenses: [expense(categoryId: 'travel')]),
+    );
+    await tester.reveal(find.text('Categories'));
+    await tester.tapText('Travel');
+    expect(find.textContaining('in all, 1 expense'), findsOneWidget);
+    expect(find.text('Dinner'), findsOneWidget);
+
+    // Adding from here fills in the category.
+    await tester.tapText('Add expense');
+    await tester.type('Train');
+    await tester.next();
+    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    expect(find.widgetWithText(ActionChip, 'Travel'), findsOneWidget);
+    await tester.next();
+    await tester.type('300');
+    await tester.next();
+    await tester.next();
+    await tester.next();
+    await tester.tapText('Add expense');
+    expect(store.ledger.expenses.last.categoryId, 'travel');
+  });
+
+  testWidgets('/categories opens every category', (tester) async {
+    await pumpApp(tester, ledgerWith());
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'categories');
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(find.text('Your categories'), findsOneWidget);
+    expect(find.text('Rent'), findsOneWidget);
   });
 }
 

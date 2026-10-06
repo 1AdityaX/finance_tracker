@@ -10,6 +10,8 @@ import '../flows/flows.dart';
 import '../theme.dart';
 import 'backup.dart';
 import 'bill_screen.dart';
+import 'categories_screen.dart';
+import 'category_screen.dart';
 import 'friend_screen.dart';
 import 'spending_screen.dart';
 import 'widgets.dart';
@@ -75,6 +77,12 @@ final commands = [
     'Add a category to sort your spending by',
     Icons.sell_outlined,
     CategoryFlow.new,
+  ),
+  Command.screen(
+    'categories',
+    'See your categories and edit or delete them',
+    Icons.sell_outlined,
+    (store) => CategoriesScreen(store: store),
   ),
 ];
 
@@ -359,6 +367,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             const SectionHeader('Bills'),
             for (final bill in ledger.billsInOrder) _billTile(ledger, bill),
+            const SectionHeader('Categories'),
+            if (ledger.categories.isEmpty)
+              const EmptyNote('Add categories with /category.'),
+            for (final category in ledger.recentCategories)
+              _categoryTile(ledger, category),
             const SectionHeader('Recent'),
             if (ledger.expenses.isEmpty &&
                 ledger.payments.isEmpty &&
@@ -397,6 +410,27 @@ class _HomeScreenState extends State<HomeScreen> {
       }),
       trailing: TrailingAmount(rupees(spending.total)),
       onTap: () => _open(SpendingScreen(store: store)),
+    );
+  }
+
+  Widget _categoryTile(Ledger ledger, Category category) {
+    final expenses = ledger.expenses.where((e) => e.categoryId == category.id);
+    final total = expenses.fold(0, (sum, e) => sum + (e.shares[me] ?? 0));
+    return ListTile(
+      leading: const IconBadge(Icons.sell_outlined),
+      title: Text(category.name),
+      subtitle: Text(
+        [
+          switch (expenses.length) {
+            0 => 'No expenses yet',
+            1 => '1 expense',
+            final n => '$n expenses',
+          },
+          if (!category.counted) 'not counted',
+        ].join(' · '),
+      ),
+      trailing: TrailingAmount(rupees(total)),
+      onTap: () => _open(CategoryScreen(store: store, categoryId: category.id)),
     );
   }
 
