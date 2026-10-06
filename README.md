@@ -19,6 +19,7 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 | `/category` | What's it called? · Count it in your spending? |
 | `/categories` | Opens the list of categories |
 | `/spending` | Opens monthly spending |
+| `/import` | Choose a file, check what it adds, then add it |
 | `/undo` | Reverts the last change |
 
 - Defaults: no category, bill General, quantity 1, payer you, equal split (by quantity when there is more than one unit), and no expenses for a payment (it goes to the overall balance).
@@ -46,6 +47,17 @@ There are no preset categories. Add them with `/category`, or by typing a name o
 A category can be excluded from spending by answering "No, leave it out" to "Count it in your spending?". Use this for large costs someone else paid for, like college fees. Its expenses are listed under "Not counted in spending" and the month's summary adds "Plus ₹1,00,000 not counted".
 
 `/income` records money nobody owes back, such as pocket money or a gift. It doesn't change any balance; for a friend paying you back, use `/receive`. The spending page shows it under "Money in".
+
+## Importing
+
+`/import` adds records from a file, such as a bank statement sorted into expenses. Choose the file and the app shows what it would add: how many expenses, payments and money in, their dates, and any new friends, categories and bills. Nothing is saved until you tap "Add to my records", and Undo takes it back.
+
+The file is a ledger in the same JSON format the app saves (see [Data](#data)), at any supported version. Importing:
+
+- only adds; nothing you have is changed or removed.
+- matches friends, categories and bills to yours by name, ignoring case, so it never makes a second friend with the same name.
+- skips expenses, payments and money in whose id you already have, so importing a file twice adds nothing.
+- refuses a file whose records don't add up, such as exact parts that don't total the amount or a payment toward an expense not in the file, and says which record. Nothing is saved.
 
 ## Cloud backup
 
@@ -81,6 +93,7 @@ lib/
     spending.dart        Your spending in a month, by category and by bill
     store.dart           Persistence (SQLite), undo, and upgrading old data
     cloud.dart           Syncing with a cloud copy: diffs, three-way merge, SyncedStorage
+    import.dart          Adding records from a file, matched to yours by name
   cloud/
     firestore_cloud.dart The ledger in Firestore, one document per record
     account.dart         Google sign-in, and keeping the ledger in step with Firestore
@@ -96,6 +109,7 @@ lib/
     spending_screen.dart A month of spending: total, comparison, bars, expenses
     categories_screen.dart  The list of categories
     category_screen.dart One category: its expenses, editing and deleting it
+    import_screen.dart   Choosing a file to import and previewing it
     backup.dart          The "Back up to Google" row and signing in
     widgets.dart         Shared rows, labels, and the undo snackbar
 test/                    Unit tests for data, sync and flows, widget tests for every flow

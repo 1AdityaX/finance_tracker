@@ -13,6 +13,7 @@ import 'bill_screen.dart';
 import 'categories_screen.dart';
 import 'category_screen.dart';
 import 'friend_screen.dart';
+import 'import_screen.dart';
 import 'spending_screen.dart';
 import 'widgets.dart';
 
@@ -83,6 +84,12 @@ final commands = [
     'See your categories and edit or delete them',
     Icons.sell_outlined,
     (store) => CategoriesScreen(store: store),
+  ),
+  Command.screen(
+    'import',
+    'Add expenses, payments and money in from a file',
+    Icons.file_open_outlined,
+    (store) => ImportScreen(store: store),
   ),
 ];
 
