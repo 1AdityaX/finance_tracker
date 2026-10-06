@@ -1,13 +1,11 @@
-# Contributing to Between
-
-Thanks for helping. This guide gets the app running on your computer, then covers the optional parts: cloud backup with your own Firebase project, and signing release builds. It ends with how changes are made and checked.
+# Contributing
 
 ## 1. Run the app
 
 You need:
 
-- **Flutter 3.44** on the stable channel (Dart 3.12). Check with `flutter doctor`.
-- **Android Studio**, which brings the Android SDK, an emulator and Java, or a phone with USB debugging on. For iOS, Xcode on a Mac.
+- Flutter 3.44, stable channel (Dart 3.12). Check with `flutter doctor`.
+- Android Studio (Android SDK, emulator, Java) or a phone with USB debugging. For iOS, Xcode on a Mac.
 
 ```sh
 git clone https://github.com/1AdityaX/finance_tracker.git
@@ -16,11 +14,11 @@ flutter pub get
 flutter run
 ```
 
-That's enough for almost every change. Without a Firebase config the app keeps records on the device only, and the "Back up to Google" row doesn't appear.
+Without a Firebase config, records stay on the device and the "Back up to Google" row is hidden. That's fine for most changes.
 
 ## 2. Check your work
 
-Run these before every commit. The strict lint rules live in `analysis_options.yaml`.
+Before every commit:
 
 ```sh
 dart format lib test
@@ -28,11 +26,11 @@ flutter analyze
 flutter test
 ```
 
-All tests must pass and the analyzer must report no issues. Widget tests drive a simulated keyboard, so after changing a flow also try it on a real device. README.md lists the manual checks.
+Tests must pass and the analyzer must be clean. After changing a flow, also run the manual device checks in README.md.
 
-## 3. Optional: cloud backup with your own Firebase project
+## 3. Optional: cloud backup
 
-Backup uses Firebase Authentication (Google sign-in) and Cloud Firestore. Each developer uses their own Firebase project, and its config file is gitignored.
+Backup uses Firebase Authentication (Google sign-in) and Cloud Firestore. Use your own Firebase project; its config file is gitignored.
 
 ### Install the tools
 
@@ -43,15 +41,15 @@ firebase login
 
 ### Create the project
 
-1. Open https://console.firebase.google.com, choose **Create a project**, and turn Google Analytics off.
-2. Choose the **Android** icon and register the app with the package name `com.example.finance_tracker`, exactly as in `android/app/build.gradle.kts`.
-3. Download **google-services.json** and put it at `android/app/google-services.json`. Skip the console's SDK steps; the project already has them.
+1. At https://console.firebase.google.com, choose **Create a project** and turn Google Analytics off.
+2. Choose the **Android** icon and register the package name `com.example.finance_tracker`, as in `android/app/build.gradle.kts`.
+3. Download **google-services.json** to `android/app/google-services.json`. Skip the console's SDK steps; they're already done.
 
-You don't need `flutterfire configure`. The app reads `google-services.json` directly. If you ran it anyway, delete `lib/firebase_options.dart` and `firebase.json`, and run `git checkout android/` to undo its Gradle edits.
+Don't run `flutterfire configure`; the app reads `google-services.json` directly. If you ran it, delete `lib/firebase_options.dart` and `firebase.json`, and run `git checkout android/` to undo its Gradle edits.
 
-### Add your signing fingerprints
+### Add signing fingerprints
 
-Google sign-in only works for builds whose signing key Firebase knows. Get the fingerprints:
+Google sign-in only works for builds signed with a key Firebase knows.
 
 ```sh
 # Debug builds (flutter run):
@@ -60,13 +58,13 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 keytool -list -v -keystore ~/keys/between-release.jks -alias upload
 ```
 
-In the console, go to **Project settings → Your apps → Add fingerprint** and add the **SHA-1** and **SHA-256** of each. Then download `google-services.json` again, so it includes the sign-in client, and replace the old one.
+In **Project settings → Your apps → Add fingerprint**, add the **SHA-1** and **SHA-256** of each. Then download `google-services.json` again (it now includes the sign-in client) and replace the old one.
 
-### Turn on sign-in and the database
+### Enable sign-in and the database
 
-1. **Authentication → Get started → Sign-in method → Google → Enable**, pick a support email, and save.
-2. **Firestore Database → Create database**. Choose a location near you, such as `asia-south1 (Mumbai)`; it can't be changed later. Start in **production mode**.
-3. In Firestore's **Rules** tab, publish these rules, so each person can reach only their own records:
+1. **Authentication → Get started → Sign-in method → Google → Enable**, pick a support email, save.
+2. **Firestore Database → Create database**. Pick a nearby location, e.g. `asia-south1 (Mumbai)`; it can't be changed later. Start in **production mode**.
+3. In Firestore's **Rules** tab, publish:
 
 ```
 rules_version = '2';
@@ -81,22 +79,22 @@ service cloud.firestore {
 
 ### Try it
 
-Run `flutter run`, tap **Back up to Google** on home, and sign in. Your records appear in Firestore under `users/{your uid}`, one document per record. Uninstall, reinstall and sign in again, and they come back.
+`flutter run`, tap **Back up to Google** on home, and sign in. Records appear under `users/{your uid}`, one document per record. Reinstall and sign in again to check they come back.
 
-If sign-in says it isn't set up for this build, the fingerprint of the key that signed the build is missing from Firebase, or `google-services.json` is older than the fingerprints. Fix both, then rebuild.
+If sign-in says it isn't set up for this build, either the signing key's fingerprint is missing from Firebase or `google-services.json` predates it. Fix both and rebuild.
 
 ## 4. Optional: sign release builds
 
-Android only installs an update over an app signed with the same key. A different key means uninstalling, which erases the app's records. Make one key and keep using it.
+Android only installs an update signed with the same key, and switching keys means uninstalling, which erases records. Make one key and keep it.
 
 ```sh
 mkdir -p ~/keys
 keytool -genkey -v -keystore ~/keys/between-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 ```
 
-It asks for a password; save it in your password manager, and back up the `.jks` file somewhere safe. If you lose either, you can never update the installed app again.
+Store the password in a password manager and back up the `.jks` file. Lose either and you can't update the installed app.
 
-Create `android/key.properties`. It's gitignored; never commit it or the `.jks`:
+Create `android/key.properties` (gitignored; never commit it or the `.jks`):
 
 ```properties
 storePassword=<the password you typed>
@@ -105,30 +103,28 @@ keyAlias=upload
 storeFile=/Users/you/keys/between-release.jks
 ```
 
-Then build:
+Build:
 
 ```sh
 flutter build apk --release --split-per-abi
 # build/app/outputs/flutter-apk/app-arm64-v8a-release.apk fits most phones
 ```
 
-Without `key.properties`, release builds fall back to the debug key, so `flutter run --release` still works.
+Without `key.properties`, release builds use the debug key.
 
 ## 5. Making a change
 
-- **Read README.md first.** It explains how flows, questions and the ledger fit together, and where each piece lives.
-- **Keep it small and plain.** Add only the code a change needs, match the surrounding style, and prefer clear names to comments. When a comment is needed, explain why.
-- **Money is integer paise.** Splits must add up exactly. See "Money rules" in README.md.
-- **Never reset saved data.** If you change the ledger's JSON, bump `Ledger.version` and teach `decodeLedger` to read the old format, with a test.
-- **Test what you change.** Data and flows have unit tests in `test/`; screens have widget tests in `test/app_test.dart`.
-- **UI follows DESIGN.md**, the colours, type, spacing and components the app uses, and **PRODUCT.md** for who it's for.
-- **Commits:** one logical change per commit, with a short imperative subject ("Let one payment pay toward several expenses") and a body saying what changed and why.
+- README.md describes how flows, questions and the ledger fit together.
+- Keep changes small, match the surrounding style, and prefer clear names to comments. Comments explain why.
+- Money is integer paise and splits must sum exactly. See "Money rules" in README.md.
+- Never reset saved data. If the ledger JSON changes, bump `Ledger.version` and teach `decodeLedger` the old format, with a test.
+- Test what you change: unit tests for data and flows in `test/`, widget tests in `test/app_test.dart`.
+- UI: money uses tabular figures (`tabular` in `theme.dart`); balance colours come from `forSign`, and what you owe is amber, never error red (red is for validation errors); pages use a 20px side gutter.
+- Commits: one logical change each, a short imperative subject ("Let one payment pay toward several expenses"), and a body saying what changed and why.
 
 ### Pull requests
 
-Before opening one, check that:
-
 - [ ] `dart format`, `flutter analyze` and `flutter test` are clean.
-- [ ] New behaviour has tests, and README.md is updated where behaviour changed.
-- [ ] You tried the change on a device or emulator, including at a large text size.
-- [ ] No secrets are committed: `key.properties`, `*.jks` and `google-services.json` stay local.
+- [ ] New behaviour has tests, and README.md reflects behaviour changes.
+- [ ] Tried on a device or emulator, including at a large text size.
+- [ ] No secrets committed: `key.properties`, `*.jks` and `google-services.json` stay local.

@@ -160,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) _dismiss();
     },
-    // Ctrl+K or Cmd+K opens the commands from a hardware keyboard.
     child: CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyK, control: true):
@@ -264,11 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) {
-              final matches = _matches;
               if (_input.text.trim().toLowerCase() == 'undo') {
                 _undo();
-              } else if (matches.isNotEmpty) {
-                _run(matches.first);
+              } else if (_matches.firstOrNull case final match?) {
+                _run(match);
               }
             },
           ),

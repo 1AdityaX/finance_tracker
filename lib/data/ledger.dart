@@ -475,8 +475,7 @@ class Ledger {
 
   /// Adds or replaces records by id. A payment that went wholly to expenses
   /// that are now all in another bill follows them there, so it is listed
-  /// where its money counts. (Money put toward an expense always counts in
-  /// that expense's bill; any rest stays in the payment's.)
+  /// where its money counts.
   Ledger put({
     Friend? friend,
     Bill? bill,

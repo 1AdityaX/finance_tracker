@@ -200,16 +200,16 @@ class ActivityList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ledger = store.ledger;
     // What is still open with this friend on each expense.
     final open = friendId == null
         ? const <String, int>{}
-        : store.ledger.expenseBalances(friendId!);
+        : ledger.expenseBalances(friendId!);
     final rows = <({DateTime date, Object record})>[
       for (final e in expenses) (date: e.date, record: e),
       for (final p in payments) (date: p.date, record: p),
       for (final i in incomes) (date: i.date, record: i),
     ]..sort((a, b) => b.date.compareTo(a.date));
-    final ledger = store.ledger;
     final bills = {for (final b in ledger.bills) b.id: b.name};
     final categories = {for (final c in ledger.categories) c.id: c.name};
     final expenseNames = {for (final e in ledger.expenses) e.id: e.name};
@@ -274,8 +274,7 @@ class ActivityList extends StatelessWidget {
             : '${effect > 0 ? '+' : '−'}${rupees(effect.abs())}',
         sign: effect?.sign,
       ),
-      onTap: () =>
-          startFlow(context, store, ExpenseFlow(store.ledger, existing: e)),
+      onTap: () => startFlow(context, store, ExpenseFlow(ledger, existing: e)),
     );
   }
 

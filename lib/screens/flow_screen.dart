@@ -542,68 +542,65 @@ class _Review extends StatelessWidget {
           strip,
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: _card(theme, scheme, heading),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (flow.editing)
+                  Text(
+                    'Tap an answer above to change it.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  )
+                else
+                  Semantics(
+                    header: true,
+                    headingLevel: 1,
+                    liveRegion: true,
+                    child: Text(
+                      'Look right?',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(heading.title, style: theme.textTheme.titleLarge),
+                        const SizedBox(height: 4),
+                        Text(
+                          rupees(heading.amount),
+                          style: theme.textTheme.displaySmall?.copyWith(
+                            fontFeatures: tabular,
+                          ),
+                        ),
+                        if (flow.date case final date?) _date(theme, date),
+                        for (final section in flow.review)
+                          if (section.isNotEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Divider(),
+                            ),
+                            for (final line in section) _line(theme, line),
+                          ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _card(
-    ThemeData theme,
-    ColorScheme scheme,
-    ({String title, int amount}) heading,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (flow.editing)
-        Text(
-          'Tap an answer above to change it.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        )
-      else
-        Semantics(
-          header: true,
-          headingLevel: 1,
-          liveRegion: true,
-          child: Text('Look right?', style: theme.textTheme.headlineSmall),
-        ),
-      const SizedBox(height: 16),
-      DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(heading.title, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                rupees(heading.amount),
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontFeatures: tabular,
-                ),
-              ),
-              if (flow.date case final date?) _date(theme, date),
-              for (final section in flow.review)
-                if (section.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Divider(),
-                  ),
-                  for (final line in section) _line(theme, line),
-                ],
-            ],
-          ),
-        ),
-      ),
-    ],
-  );
 
   /// The record's day, which a tap changes.
   Widget _date(ThemeData theme, DateTime date) {
@@ -651,40 +648,37 @@ class _Review extends StatelessWidget {
     );
   }
 
-  Widget _line(ThemeData theme, Line line) {
-    final color = theme.colorScheme.forSign(line.sign);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(line.label, style: theme.textTheme.bodyLarge),
-                if (line.detail case final detail?)
-                  Text(
-                    detail,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+  Widget _line(ThemeData theme, Line line) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(line.label, style: theme.textTheme.bodyLarge),
+              if (line.detail case final detail?)
+                Text(
+                  detail,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Text(
-            line.value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontFeatures: tabular,
-              color: line.sign == 0 ? null : color,
-            ),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          line.value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontFeatures: tabular,
+            color: line.sign == 0 ? null : theme.colorScheme.forSign(line.sign),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 /// Fades the last [height] pixels of a scrolling [child] whose bottom

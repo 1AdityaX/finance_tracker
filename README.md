@@ -1,12 +1,12 @@
 # Between
 
-A private, local-first Flutter app for tracking what you spend, on your own or shared with friends, and what's owed between you. Every record is kept in a SQLite database on the device and works fully offline. Signing in with Google is optional: it backs your records up to Firestore so they survive a reinstall or move to a new phone. No bank connections, and no messages sent for you.
+A Flutter app for tracking what you spend, alone or shared with friends, and who owes whom. Records live in a SQLite database on the device and work offline. Google sign-in is optional and backs records up to Firestore. There are no bank connections.
 
-Target platforms: Android and iOS.
+Platforms: Android and iOS.
 
 ## How it works
 
-Every action starts from a slash command. Tap one of the shortcuts above the command bar, or type `/` and pick one. The app then asks one question per page and builds the record as you answer.
+Every action is a slash command. Tap a shortcut above the command bar, or type `/` and pick one. The app asks one question per page.
 
 | Command | Questions, in order |
 | --- | --- |
@@ -17,56 +17,56 @@ Every action starts from a slash command. Tap one of the shortcuts above the com
 | `/bill` | What's it called? |
 | `/friend` | What's their name? |
 | `/category` | What's it called? · Count it in your spending? |
-| `/spending` | Opens where your money went, month by month |
+| `/spending` | Opens monthly spending |
 | `/undo` | Reverts the last change |
 
-- **Defaults are filled in.** The category starts as none, the bill as General, the quantity as 1, the payer as you, the split as equal (or by quantity when there is more than one unit), and a payment's expenses as none (toward the overall balance). Accepting a default is one tap.
-- **Questions that don't apply are skipped.** An expense nobody shared is just yours, so who paid and how to split it are only asked once you pick a friend. Splitting by quantity appears only when there is more than one unit. Started from a bill's or friend's page, that answer is filled in and skipped, but still shows as a chip.
-- **Answers so far show as chips** at the top of every page, for example `Pizza · in Goa trip · ₹1,200 · 4 units`. Tap one to change it; the flow then returns to the first question that needs another look, or straight to the review.
-- **Back goes to the previous page**, including the system back gesture, and keeps every answer. Closing a flow asks first only if answers would be lost.
-- **A review card** shows each person's share, who will owe whom, and your spending for the month before you save. Its date is today; tap it to pick another day.
-- **Every save can be undone** from the snackbar, or later with `/undo`.
-- **New friends, bills and categories can be added from a picker** by typing a name. They are saved together with the record, so cancelling leaves nothing behind.
+- Defaults: no category, bill General, quantity 1, payer you, equal split (by quantity when there is more than one unit), and no expenses for a payment (it goes to the overall balance).
+- Questions that don't apply are skipped. Who paid and how to split are asked only once a friend is picked. Splitting by quantity appears only with more than one unit. A flow started from a bill's or friend's page fills that answer in and skips it.
+- Answers so far show as chips at the top, e.g. `Pizza · in Goa trip · ₹1,200 · 4 units`. Tapping one goes back to that question, then on to the next question that needs an answer, or to the review.
+- Back, including the system gesture, goes to the previous page and keeps answers. Closing a flow asks for confirmation only if answers would be lost.
+- The review card shows each share, who will owe whom, and your spending for the month. The date defaults to today; tap it to change it.
+- Every save can be undone from the snackbar or with `/undo`.
+- Pickers can add a new friend, bill or category by typing a name. It is saved with the record, so cancelling adds nothing.
 
-Tap any expense or payment to open it on its review card. Tap an answer to edit it, or use the bin icon to delete the record. A friend's page records money sent or received with the friend filled in, and a bill's page adds expenses to that bill.
+Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
 ## Spending
 
-`/spending`, or the "Spent in" row on the home screen, shows one month at a time:
+`/spending`, or the "Spent in" row on home, shows one month:
 
-- What you spent, and how it compares with the month before. The current month is compared with the same days of last month.
-- Your spending by category and by bill, as bars of each one's share. Expenses without a category are grouped last, under "No category".
-- Every expense with your share in it, biggest first. Tap a category or bill to narrow the list; tap an expense to edit it.
+- Total spent, compared with the previous month (the current month is compared with the same days of last month).
+- Spending by category and by bill as bars. Uncategorised expenses come last, under "No category".
+- Every expense you have a share in, largest first. Tap a category or bill to filter; tap an expense to edit it.
 
-Spending is your share of each expense: all of an expense that was just yours, your part of a split one. Money you paid for friends isn't spending, it's what they owe you, and payments between you never count.
+Spending is your share of each expense. Money you paid for friends is what they owe you, not spending, and payments between people never count.
 
-Categories are your own; there is no preset list. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed and deleted. Deleting a category keeps its expenses, without a category.
+There are no preset categories. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed or deleted. Deleting a category leaves its expenses uncategorised.
 
-**Big costs someone else paid for.** A category can be left out of spending: answer "No, leave it out" to "Count it in your spending?". Its expenses, like college fees your parents sent the money for, are still recorded and listed under "Not counted in spending", but they don't swamp what you spend day to day. The month's sentence notes them as "Plus ₹1,00,000 not counted".
+A category can be excluded from spending by answering "No, leave it out" to "Count it in your spending?". Use this for large costs someone else paid for, like college fees. Its expenses are listed under "Not counted in spending" and the month's summary adds "Plus ₹1,00,000 not counted".
 
-**Money in.** `/income` records money you got that nobody owes back: pocket money, a parent paying for something, a gift from a friend. It never changes anyone's balance; for a friend paying you back, use `/receive`. The spending page says how much came in that month and lists it under "Money in".
+`/income` records money nobody owes back, such as pocket money or a gift. It doesn't change any balance; for a friend paying you back, use `/receive`. The spending page shows it under "Money in".
 
 ## Cloud backup
 
-On Android, the home screen offers **Back up to Google**. After signing in once:
+Android only for now. After tapping **Back up to Google** on home and signing in:
 
-- Every change is saved on the phone first, then copied to Firestore in the background. Offline changes are sent when the phone is back online.
-- On a reinstall or a new phone, **Restore from Google** on the welcome screen, or **Back up to Google** on home, brings every record back.
-- Changes made on another phone arrive the next time the app opens. Copies are merged record by record: a record changed on one side takes that side's version, so additions, edits and deletions all carry over. A record changed on both sides keeps this phone's version, and an edit is never lost to a deletion.
-- Signing out keeps every record on the phone; new changes just aren't backed up.
+- Changes are saved on the phone first, then copied to Firestore in the background. Offline changes are sent when the phone reconnects.
+- After a reinstall or on a new phone, **Restore from Google** on the welcome screen (or **Back up to Google** on home) brings records back.
+- Changes from another phone arrive the next time the app opens. Merging is per record: a record changed on one side takes that side's version. A record changed on both sides keeps this phone's version, and an edit wins over a deletion.
+- Signing out keeps records on the phone and stops backing up.
 
-Each person's records live under `users/{uid}` in Firestore, one document per record, and security rules let a signed-in user read and write only their own. Backup is optional at build time too: without a Firebase config the app builds and runs with records on the phone only, and the backup row doesn't appear. iOS isn't set up for backup yet.
+Records are stored under `users/{uid}`, one document per record; security rules limit each user to their own. Without a Firebase config the app still builds and runs, and the backup row is hidden.
 
 ## Getting started
 
-Requirements: Flutter 3.44 (stable channel, Dart 3.12) and an Android emulator or device, or Xcode with an iOS simulator.
+Requires Flutter 3.44 (stable, Dart 3.12) and an Android emulator or device, or Xcode with an iOS simulator.
 
 ```sh
 flutter pub get
 flutter run
 ```
 
-That's all you need to work on the app. To try cloud backup, sign release builds, or contribute, see [CONTRIBUTING.md](CONTRIBUTING.md), which walks through setting up Firebase and a signing key locally.
+For Firebase backup and release signing, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project structure
 
@@ -101,7 +101,7 @@ test/                    Unit tests for data, sync and flows, widget tests for e
 
 ### Adding or changing a question
 
-A flow is plain Dart with no widgets in it. It holds its questions as `Ask` objects and lists the ones that currently apply in `asks`:
+A flow is plain Dart with no widgets. It holds its questions as `Ask` objects and lists the ones that currently apply in `asks`:
 
 ```dart
 @override
@@ -111,33 +111,37 @@ List<Ask> get asks => [
 ];
 ```
 
-`FlowScreen` shows the first question that is unanswered or no longer valid, so a conditional question is just an `if` in that list. Each `Ask` reports its own `problem` (or null) and a short `phrase` for its chip. A flow's `save()` turns the answers into a new `Ledger`, and `review` lists the lines for its review card. Flows are tested directly in `test/flows_test.dart`, without pumping widgets.
+`FlowScreen` shows the first question that is unanswered or invalid, so a conditional question is an `if` in that list. Each `Ask` has a `problem` (null when valid) and a `phrase` for its chip. `save()` turns the answers into a new `Ledger`, and `review` lists the review card lines. A flow that sets `date` gets a date picker on its review card. Flows are tested without widgets in `test/flows_test.dart`.
 
-A flow that keeps a date sets `date`; the review card then shows it and lets the user pick another day.
-
-To add a command, write a `CommandFlow` subclass and add a `Command` to the list in `home_screen.dart`, or a `Command.screen` for one that opens a page.
+To add a command, subclass `CommandFlow` and add a `Command` to the list in `home_screen.dart`, or a `Command.screen` for one that opens a page.
 
 ## Money rules
 
-- Money is stored as integer paise and shown with Indian digit grouping, for example ₹12,34,567.50.
-- Shares always add up to the total. Equal, quantity, and percentage splits hand out leftover paise by largest remainder, breaking ties by person id, so a split always rounds the same way.
+- Money is stored as integer paise and shown with Indian digit grouping, e.g. ₹12,34,567.50.
+- Shares always sum to the total. Equal, quantity and percentage splits hand out leftover paise by largest remainder, ties broken by person id, so rounding is deterministic.
 - Percentages are stored as basis points, so 33.33% is exact.
-- If exactly one person's share is left blank, they get whatever is left.
-- A positive balance means the friend owes you; negative means you owe them. Expenses solely between other people don't affect your balances.
-- Money received lowers what a friend owes you. Money sent lowers what you owe them. Money in (`/income`) is neither: nobody owes anything for it.
-- One payment can pay toward several expenses. Tick them on "Which expenses?" and the amount goes to them in the order ticked, each taking up to what is still open on it: ₹31 for ₹15 of lollipops then ₹17.50 of nachos pays the lollipops in full and ₹16 of the nachos, leaving ₹1.50 open. Whatever the expenses don't take counts toward the overall balance. If the money runs out before a ticked expense, the page says so and won't continue until it is unticked or ticked earlier. The money is never counted twice.
-- What a payment puts toward an expense counts in that expense's bill; the rest counts in the payment's bill. A bill's page lists every payment with money in it. Opening a payment never moves its money: it keeps its split until you change the amount or the ticks.
-- Deleting an expense keeps its payments in the balance; what they put toward it counts toward the overall balance instead. Deleting a bill deletes its expenses and moves its payments to General.
+- If exactly one share is left blank, it gets the remainder.
+- A positive balance means the friend owes you; negative means you owe them. Expenses only between other people don't affect your balances.
+- Money received lowers what a friend owes you; money sent lowers what you owe them. `/income` affects no balance.
+- A payment can go toward several expenses. Ticked expenses are paid in the order ticked, each up to what is still open on it. For example, ₹31 toward ₹15 of lollipops then ₹17.50 of nachos pays the lollipops in full and ₹16 of the nachos, leaving ₹1.50 open. Any remainder goes to the overall balance. If the money runs out before a ticked expense, the page blocks until it is unticked or reordered. Nothing is counted twice.
+- The part of a payment that goes to an expense counts in that expense's bill; the rest counts in the payment's bill, and a bill's page lists every payment with money in it. Opening a payment doesn't change its allocation unless you change the amount or the ticks.
+- Deleting an expense keeps its payments; what they put toward it moves to the overall balance. Deleting a bill deletes its expenses and moves its payments to General.
 
 ## Data
 
-The whole ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement on every change. A failed save leaves the previous state in place, and a failed load is reported without writing anything.
+The ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement per change. A failed save keeps the previous state; a failed load is reported without writing anything.
 
-The document carries a `version`, now 5. Version 3 added categories, version 4 lets a payment pay toward several expenses (`settles`: expense id to paise, in order), and version 5 adds money in (`incomes`) and categories left out of spending (`counted: false`). Older data reads as is, with a payment that named an expense putting its whole amount toward it. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
+The document has a `version`, currently 5:
 
-Undo history holds the last 50 changes, in memory only.
+- 3 added categories.
+- 4 lets a payment go toward several expenses (`settles`: expense id to paise, in order).
+- 5 adds money in (`incomes`) and categories excluded from spending (`counted: false`).
 
-When backed up, `SyncedStorage` (`lib/data/cloud.dart`) wraps the SQLite storage. It writes to the phone first and sends each change to Firestore without waiting. It also keeps what the cloud last held in `cloud_base.db`, so that connecting can tell what changed on each side since. All of the merging is plain Dart, tested in `test/cloud_test.dart` against an in-memory cloud.
+Older data loads as is; a payment that named one expense puts its whole amount toward it. Version 1 data is upgraded on load with balances unchanged (see `decodeLedger` in `lib/data/store.dart`). Format changes must add an upgrade path, never reset data.
+
+Undo keeps the last 50 changes, in memory only.
+
+With backup on, `SyncedStorage` (`lib/data/cloud.dart`) wraps the SQLite storage. It writes locally first and sends each change to Firestore without waiting. It keeps the last known cloud state in `cloud_base.db` so it can tell what changed on each side. Merging is plain Dart, tested in `test/cloud_test.dart` against an in-memory cloud.
 
 ## Development
 
@@ -147,22 +151,22 @@ flutter analyze
 flutter test
 ```
 
-`analysis_options.yaml` enables strict casts, inference and raw types, plus a few extra lints.
+`analysis_options.yaml` enables strict casts, inference and raw types, plus some extra lints.
 
 ### Manual device checks
 
-Widget tests drive a simulated keyboard, so check these by hand on a real device after changing a flow:
+Widget tests use a simulated keyboard. After changing a flow, check on a real device that:
 
-- Moving from one typed answer to the next keeps the keyboard open.
-- On iPhone, the amount keypad has no return key; Continue stays visible above it.
-- At the largest system text size, the question, its input, and Continue are all reachable.
-- Android's back gesture steps back through the questions; on the first page it closes the flow.
+- Moving between typed answers keeps the keyboard open.
+- On iPhone, the amount keypad has no return key and Continue stays visible above it.
+- At the largest system text size, the question, input and Continue are reachable.
+- Android's back gesture steps back through questions and closes the flow from the first page.
 
 ## Releasing
 
-**Application ID.** The app still uses the Flutter template identifiers `com.example.finance_tracker` (Android) and `com.example.financeTracker` (iOS). Choose permanent identifiers before publishing; they cannot change after release.
+**Application ID.** The app still uses the template IDs `com.example.finance_tracker` (Android) and `com.example.financeTracker` (iOS). Pick permanent ones before publishing; they can't change after release.
 
-**Android signing.** Release builds must always be signed with the same key: Android only installs an update over an app signed with the same key, and uninstalling erases its records. Release builds read signing credentials from `android/key.properties`, which is gitignored (CONTRIBUTING.md shows how to make a key):
+**Android signing.** Always sign releases with the same key. Android won't install an update signed with a different key, and uninstalling erases the app's records. Release builds read `android/key.properties` (gitignored; CONTRIBUTING.md shows how to make a key):
 
 ```properties
 storePassword=<keystore password>
@@ -171,10 +175,10 @@ keyAlias=upload
 storeFile=<keystore path, absolute or relative to android/app>
 ```
 
-Without this file, release builds fall back to debug signing so `flutter run --release` still works locally. See [Build and release an Android app](https://docs.flutter.dev/deployment/android).
+Without it, release builds use debug signing so `flutter run --release` works locally. See [Build and release an Android app](https://docs.flutter.dev/deployment/android).
 
-**iOS signing.** Open `ios/Runner.xcworkspace` in Xcode and set your development team and bundle identifier.
+**iOS signing.** Set the development team and bundle identifier in `ios/Runner.xcworkspace` in Xcode.
 
 ## Not yet implemented
 
-Receipt scanning, bank imports, budgets, notifications, live sync between phones open at the same time, and cloud backup on iOS.
+Receipt scanning, bank imports, budgets, notifications, live sync between phones, and cloud backup on iOS.

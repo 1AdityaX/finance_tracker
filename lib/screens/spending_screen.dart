@@ -9,9 +9,7 @@ import '../theme.dart';
 import 'categories_screen.dart';
 import 'widgets.dart';
 
-/// Where your money went, a month at a time: what you spent, how that
-/// compares with the month before, and what it went on, by category and by
-/// bill. Tapping a category or bill narrows the expenses listed below.
+/// Where your money went, a month at a time, by category and by bill.
 class SpendingScreen extends StatefulWidget {
   const SpendingScreen({super.key, required this.store});
   final Store store;
@@ -213,19 +211,13 @@ class _SpendingScreenState extends State<SpendingScreen> {
       context,
     ).textTheme.headlineSmall?.copyWith(fontFeatures: tabular);
     final name = monthName(month);
-    final current = month == _thisMonth;
-    if (spending.total == 0) {
-      return Text(
-        current ? 'Nothing spent in $name yet.' : 'Nothing spent in $name.',
-        style: style,
-      );
-    }
-    return Text(
-      current
-          ? 'You’ve spent ${rupees(spending.total)} so far in $name.'
-          : 'You spent ${rupees(spending.total)} in $name.',
-      style: style,
-    );
+    final total = rupees(spending.total);
+    return Text(switch ((spending.total == 0, month == _thisMonth)) {
+      (true, true) => 'Nothing spent in $name yet.',
+      (true, false) => 'Nothing spent in $name.',
+      (false, true) => 'You’ve spent $total so far in $name.',
+      (false, false) => 'You spent $total in $name.',
+    }, style: style);
   }
 
   /// How the month compares with the one before. The current month is
@@ -387,11 +379,9 @@ class _BarRow extends StatelessWidget {
         child: Ink(
           color: selected ? scheme.surfaceContainerHigh : null,
           // At least 48dp tall to tap, even without a bar.
-          padding: EdgeInsets.fromLTRB(
-            20,
-            showBar ? 10 : 12,
-            20,
-            showBar ? 10 : 12,
+          padding: EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: showBar ? 10 : 12,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

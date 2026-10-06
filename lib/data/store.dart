@@ -27,18 +27,18 @@ class SqliteStorage implements Storage {
   /// Cached as a future so concurrent first calls open the database once.
   Future<Database>? _db;
 
-  Future<Database> _open() => _db ??= () async {
-    return _factory.openDatabase(
-      path ?? '${await _factory.getDatabasesPath()}/$name',
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, _) => db.execute(
-          'CREATE TABLE tracker_state '
-          '(id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL)',
-        ),
+  Future<Database> _open() => _db ??= _create();
+
+  Future<Database> _create() async => _factory.openDatabase(
+    path ?? '${await _factory.getDatabasesPath()}/$name',
+    options: OpenDatabaseOptions(
+      version: 1,
+      onCreate: (db, _) => db.execute(
+        'CREATE TABLE tracker_state '
+        '(id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL)',
       ),
-    );
-  }();
+    ),
+  );
 
   @override
   Future<String?> read() async {
@@ -54,7 +54,7 @@ class SqliteStorage implements Storage {
   );
 }
 
-/// The app's single source of truth: the current ledger, saving, and undo.
+/// The current ledger, with saving and undo.
 class Store extends ChangeNotifier {
   Store(this._storage);
   final Storage _storage;

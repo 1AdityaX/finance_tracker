@@ -376,9 +376,7 @@ mixin _Filtering<T extends StatefulWidget> on State<T> {
       typed.isNotEmpty &&
       !choices.any((c) => c.label.toLowerCase() == typed.toLowerCase());
 
-  /// The question, a search field when useful, a row that creates what was
-  /// typed, an optional [status] line, and the matching choices drawn by
-  /// [tile]. [empty] replaces the note shown when there are no choices.
+  /// [empty] replaces the note shown when there are no choices.
   Widget choiceList(
     Ask ask,
     List<Choice> choices,
@@ -762,8 +760,6 @@ class _SplitViewState extends State<_SplitView> {
 
   /// "₹400 each", "₹200 still to assign", "All ₹1,200 assigned".
   Widget _status(ThemeData theme, Map<String, int>? shares) {
-    // Problems come from the question itself, so they read the same here as
-    // anywhere else.
     final problem = ask.problem;
     final (String text, int sign) = problem != null
         ? (problem, -1)

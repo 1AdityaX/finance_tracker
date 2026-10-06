@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Between's deep teal, kept from the first version of the app.
 const _teal = Color(0xFF176B60);
 
 ThemeData buildTheme(Brightness brightness) {
@@ -61,9 +60,7 @@ extension BalanceColors on ColorScheme {
 }
 
 extension ChartColors on ColorScheme {
-  /// The one hue for bars: Between's teal, a step brighter than [primary] so
-  /// thin marks still read as colour. Checked for lightness, chroma and
-  /// contrast against both surfaces with the dataviz palette validator.
+  /// A step brighter than [primary], so thin bars still read as colour.
   Color get bar => brightness == Brightness.light
       ? const Color(0xFF00897B)
       : const Color(0xFF1E9E8C);

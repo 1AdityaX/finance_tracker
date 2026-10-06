@@ -37,20 +37,22 @@ Map<String, Object?> normalLedger(String json) =>
 List<RecordChange> changesBetween(
   Map<String, Object?>? before,
   Map<String, Object?> after,
-) => [
-  for (final kind in recordKinds)
-    ...() {
-      final old = _byId(before?[kind]);
-      final now = _byId(after[kind]);
-      return [
-        for (final MapEntry(key: id, value: record) in now.entries)
-          if (old[id] == null || _canon(old[id]) != _canon(record))
-            (kind: kind, id: id, record: record),
-        for (final id in old.keys)
-          if (!now.containsKey(id)) (kind: kind, id: id, record: null),
-      ];
-    }(),
-];
+) {
+  final changes = <RecordChange>[];
+  for (final kind in recordKinds) {
+    final old = _byId(before?[kind]);
+    final now = _byId(after[kind]);
+    for (final MapEntry(key: id, value: record) in now.entries) {
+      if (_canon(old[id]) != _canon(record)) {
+        changes.add((kind: kind, id: id, record: record));
+      }
+    }
+    for (final id in old.keys) {
+      if (!now.containsKey(id)) changes.add((kind: kind, id: id, record: null));
+    }
+  }
+  return changes;
+}
 
 /// Combines this phone's records with the cloud's, record by record, using
 /// [base], what both last agreed on. A record changed on only one side takes
@@ -61,19 +63,19 @@ Map<String, Object?> mergeLedgers({
   required Map<String, Object?>? base,
   required Map<String, Object?> local,
   required Map<String, Object?>? remote,
-}) => {
-  'version': Ledger.version,
-  for (final kind in recordKinds)
-    kind: () {
-      final b = _byId(base?[kind]);
-      final l = _byId(local[kind]);
-      final r = _byId(remote?[kind]);
-      // This phone's order first, then what only the cloud has.
-      return [
-        for (final id in {...l.keys, ...r.keys}) ?_pick(b[id], l[id], r[id]),
-      ];
-    }(),
-};
+}) {
+  final merged = <String, Object?>{'version': Ledger.version};
+  for (final kind in recordKinds) {
+    final b = _byId(base?[kind]);
+    final l = _byId(local[kind]);
+    final r = _byId(remote?[kind]);
+    // This phone's order first, then what only the cloud has.
+    merged[kind] = [
+      for (final id in {...l.keys, ...r.keys}) ?_pick(b[id], l[id], r[id]),
+    ];
+  }
+  return merged;
+}
 
 Map<String, Object?>? _pick(
   Map<String, Object?>? base,
@@ -131,8 +133,6 @@ class SyncedStorage implements Storage {
   /// They differ when a sync changed the ledger under the store.
   String? _saved;
   String? _known;
-
-  bool get connected => _cloud != null;
 
   Future<void> _lock = Future.value();
 

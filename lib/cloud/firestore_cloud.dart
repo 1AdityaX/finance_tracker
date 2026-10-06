@@ -11,10 +11,9 @@ import '../data/cloud.dart';
 /// Each record is stored as its JSON text, so it reads back exactly as it was
 /// saved. Firestore keeps writes made offline and sends them when it can.
 class FirestoreCloud implements Cloud {
-  FirestoreCloud(this.uid, [FirebaseFirestore? db])
-    : _db = db ?? FirebaseFirestore.instance;
+  FirestoreCloud(this.uid);
   final String uid;
-  final FirebaseFirestore _db;
+  final _db = FirebaseFirestore.instance;
 
   /// Firestore allows at most 500 writes in one batch.
   static const _batchSize = 450;
@@ -54,6 +53,7 @@ class FirestoreCloud implements Cloud {
 
   @override
   Future<void> apply(int version, List<RecordChange> changes) async {
+    // At least one batch, so the version is noted even with no changes.
     for (
       var start = 0;
       start == 0 || start < changes.length;
