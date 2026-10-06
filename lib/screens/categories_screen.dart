@@ -47,7 +47,8 @@ class CategoriesScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
               child: Text(
                 'Give an expense a category when you add it, to see where '
-                'your money goes. Tap a category to rename it.',
+                'your money goes. Tap a category to rename it, or to leave it '
+                'out of your spending.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -69,11 +70,16 @@ class CategoriesScreen extends StatelessWidget {
               ListTile(
                 leading: const IconBadge(Icons.sell_outlined),
                 title: Text(category.name),
-                subtitle: Text(switch (counts[category.id] ?? 0) {
-                  0 => 'No expenses yet',
-                  1 => '1 expense',
-                  final n => '$n expenses',
-                }),
+                subtitle: Text(
+                  [
+                    switch (counts[category.id] ?? 0) {
+                      0 => 'No expenses yet',
+                      1 => '1 expense',
+                      final n => '$n expenses',
+                    },
+                    if (!category.counted) 'not counted in spending',
+                  ].join(' · '),
+                ),
                 trailing: IconButton(
                   tooltip: 'Delete ${category.name}',
                   icon: const Icon(Icons.delete_outline),

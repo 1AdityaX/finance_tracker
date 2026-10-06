@@ -13,9 +13,10 @@ Every action starts from a slash command. Tap one of the shortcuts above the com
 | `/expense` | What was it for? · Which category? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
 | `/sent` | How much? · To whom? · Which bill? · Which expenses? |
 | `/receive` | How much? · From whom? · Which bill? · Which expenses? |
+| `/income` | How much? · Who gave it? · What's it for? (optional) |
 | `/bill` | What's it called? |
 | `/friend` | What's their name? |
-| `/category` | What's it called? |
+| `/category` | What's it called? · Count it in your spending? |
 | `/spending` | Opens where your money went, month by month |
 | `/undo` | Reverts the last change |
 
@@ -40,6 +41,10 @@ Tap any expense or payment to open it on its review card. Tap an answer to edit 
 Spending is your share of each expense: all of an expense that was just yours, your part of a split one. Money you paid for friends isn't spending, it's what they owe you, and payments between you never count.
 
 Categories are your own; there is no preset list. Add them with `/category`, by typing a name on the category question, or from the tag icon on the spending page, where they can also be renamed and deleted. Deleting a category keeps its expenses, without a category.
+
+**Big costs someone else paid for.** A category can be left out of spending: answer "No, leave it out" to "Count it in your spending?". Its expenses, like college fees your parents sent the money for, are still recorded and listed under "Not counted in spending", but they don't swamp what you spend day to day. The month's sentence notes them as "Plus ₹1,00,000 not counted".
+
+**Money in.** `/income` records money you got that nobody owes back: pocket money, a parent paying for something, a gift from a friend. It never changes anyone's balance; for a friend paying you back, use `/receive`. The spending page says how much came in that month and lists it under "Money in".
 
 ## Cloud backup
 
@@ -119,7 +124,7 @@ To add a command, write a `CommandFlow` subclass and add a `Command` to the list
 - Percentages are stored as basis points, so 33.33% is exact.
 - If exactly one person's share is left blank, they get whatever is left.
 - A positive balance means the friend owes you; negative means you owe them. Expenses solely between other people don't affect your balances.
-- Money received lowers what a friend owes you. Money sent lowers what you owe them.
+- Money received lowers what a friend owes you. Money sent lowers what you owe them. Money in (`/income`) is neither: nobody owes anything for it.
 - One payment can pay toward several expenses. Tick them on "Which expenses?" and the amount goes to them in the order ticked, each taking up to what is still open on it: ₹31 for ₹15 of lollipops then ₹17.50 of nachos pays the lollipops in full and ₹16 of the nachos, leaving ₹1.50 open. Whatever the expenses don't take counts toward the overall balance. If the money runs out before a ticked expense, the page says so and won't continue until it is unticked or ticked earlier. The money is never counted twice.
 - What a payment puts toward an expense counts in that expense's bill; the rest counts in the payment's bill. A bill's page lists every payment with money in it. Opening a payment never moves its money: it keeps its split until you change the amount or the ticks.
 - Deleting an expense keeps its payments in the balance; what they put toward it counts toward the overall balance instead. Deleting a bill deletes its expenses and moves its payments to General.
@@ -128,7 +133,7 @@ To add a command, write a `CommandFlow` subclass and add a `Command` to the list
 
 The whole ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement on every change. A failed save leaves the previous state in place, and a failed load is reported without writing anything.
 
-The document carries a `version`, now 4. Version 3 added categories, and version 4 lets a payment pay toward several expenses (`settles`: expense id to paise, in order); older data reads as is, with a payment that named an expense putting its whole amount toward it. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
+The document carries a `version`, now 5. Version 3 added categories, version 4 lets a payment pay toward several expenses (`settles`: expense id to paise, in order), and version 5 adds money in (`incomes`) and categories left out of spending (`counted: false`). Older data reads as is, with a payment that named an expense putting its whole amount toward it. Data saved by the first version of the app is upgraded on load, keeping every balance it showed (see `decodeLedger` in `lib/data/store.dart`). Future format changes must add an upgrade the same way rather than resetting data.
 
 Undo history holds the last 50 changes, in memory only.
 

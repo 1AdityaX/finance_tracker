@@ -13,7 +13,9 @@ typedef Total = ({String id, int amount});
 
 /// What you spent in one calendar month: your share of each expense dated in
 /// it, whether you split it with friends or it was just yours. Money you
-/// paid for friends isn't spending; it's what they owe you.
+/// paid for friends isn't spending; it's what they owe you. Expenses in a
+/// category left out of spending are kept apart, in [uncounted], and the
+/// money you got that month is in [incomes].
 class Spending {
   Spending(this.ledger, DateTime month, {this.throughDay})
     : month = DateTime(month.year, month.month);
@@ -28,17 +30,36 @@ class Spending {
   final int? throughDay;
 
   /// Each expense you had a share in, biggest share first.
-  late final List<({Expense expense, int share})> items =
+  late final List<({Expense expense, int share})> items = _shares(
+    counted: true,
+  );
+
+  late final int total = items.fold(0, (sum, i) => sum + i.share);
+
+  /// Your share of expenses in categories left out of spending.
+  late final List<({Expense expense, int share})> uncounted = _shares(
+    counted: false,
+  );
+
+  /// Money you got this month, newest first.
+  late final List<Income> incomes = [
+    for (final i in ledger.incomes)
+      if (_counts(i.date)) i,
+  ]..sort((a, b) => b.date.compareTo(a.date));
+
+  late final int moneyIn = incomes.fold(0, (sum, i) => sum + i.amount);
+
+  List<({Expense expense, int share})> _shares({required bool counted}) =>
       [
         for (final e in ledger.expenses)
-          if (_counts(e.date) && (e.shares[me] ?? 0) > 0)
+          if (_counts(e.date) &&
+              (e.shares[me] ?? 0) > 0 &&
+              (ledger.category(e.categoryId)?.counted ?? true) == counted)
             (expense: e, share: e.shares[me]!),
       ]..sort((a, b) {
         final bySize = b.share.compareTo(a.share);
         return bySize != 0 ? bySize : b.expense.date.compareTo(a.expense.date);
       });
-
-  late final int total = items.fold(0, (sum, i) => sum + i.share);
 
   /// What you spent in each category, biggest first. Expenses with no
   /// category come last, under the id ''.

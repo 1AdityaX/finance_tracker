@@ -43,13 +43,63 @@ class Bill {
 
 /// A kind of spending, like Food or Rent. Users make their own.
 class Category {
-  const Category({required this.id, required this.name});
+  const Category({required this.id, required this.name, this.counted = true});
   final String id;
   final String name;
 
-  Map<String, Object?> toJson() => {'id': id, 'name': name};
-  factory Category.fromJson(Map<String, Object?> json) =>
-      Category(id: json['id']! as String, name: json['name']! as String);
+  /// Whether its expenses count in your spending. Off for big costs someone
+  /// else gave you the money for, like college fees, so they don't swamp
+  /// what you spend day to day.
+  final bool counted;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    if (!counted) 'counted': false,
+  };
+  factory Category.fromJson(Map<String, Object?> json) => Category(
+    id: json['id']! as String,
+    name: json['name']! as String,
+    counted: json['counted'] as bool? ?? true,
+  );
+}
+
+/// Money you got that nobody owes back, like pocket money or a gift.
+/// Unlike a payment, it never changes anyone's balance.
+class Income {
+  const Income({
+    required this.id,
+    required this.from,
+    required this.amount,
+    required this.date,
+    this.note,
+  });
+  final String id;
+
+  /// Who gave it, as typed: "Mom", or a friend's name.
+  final String from;
+
+  /// In paise.
+  final int amount;
+  final DateTime date;
+
+  /// What it's for, like "College fees".
+  final String? note;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'from': from,
+    'amount': amount,
+    'date': date.toIso8601String(),
+    'note': ?note,
+  };
+  factory Income.fromJson(Map<String, Object?> json) => Income(
+    id: json['id']! as String,
+    from: json['from']! as String,
+    amount: json['amount']! as int,
+    date: DateTime.parse(json['date']! as String),
+    note: json['note'] as String?,
+  );
 }
 
 /// How an expense is divided between the people in it.
@@ -217,6 +267,7 @@ class Ledger {
     required this.expenses,
     required this.payments,
     this.categories = const [],
+    this.incomes = const [],
   });
 
   static final empty = Ledger(
@@ -233,6 +284,7 @@ class Ledger {
   final List<Expense> expenses;
   final List<Payment> payments;
   final List<Category> categories;
+  final List<Income> incomes;
 
   Friend? friend(String id) => friends.where((f) => f.id == id).firstOrNull;
   Bill? bill(String id) => bills.where((b) => b.id == id).firstOrNull;
@@ -240,6 +292,13 @@ class Ledger {
   Payment? payment(String id) => payments.where((p) => p.id == id).firstOrNull;
   Category? category(String? id) =>
       categories.where((c) => c.id == id).firstOrNull;
+  Income? income(String id) => incomes.where((i) => i.id == id).firstOrNull;
+
+  /// Who you've had money from, most recent first.
+  List<String> get incomeSources => {
+    for (final i in incomes.toList()..sort((a, b) => b.date.compareTo(a.date)))
+      i.from,
+  }.toList();
 
   /// "You" for the device owner, otherwise the friend's name.
   String nameOf(String personId) =>
@@ -424,6 +483,7 @@ class Ledger {
     Category? category,
     Expense? expense,
     Payment? payment,
+    Income? income,
   }) {
     var next = _put(payments, payment, (p) => p.id);
     final old = expenses.where((e) => e.id == expense?.id).firstOrNull;
@@ -445,6 +505,7 @@ class Ledger {
       expenses: _put(expenses, expense, (e) => e.id),
       payments: next,
       categories: _put(categories, category, (c) => c.id),
+      incomes: _put(incomes, income, (i) => i.id),
     );
   }
 
@@ -509,18 +570,23 @@ class Ledger {
     ],
   );
 
+  Ledger removeIncome(String id) =>
+      _copy(incomes: incomes.where((i) => i.id != id).toList());
+
   Ledger _copy({
     List<Friend>? friends,
     List<Bill>? bills,
     List<Expense>? expenses,
     List<Payment>? payments,
     List<Category>? categories,
+    List<Income>? incomes,
   }) => Ledger(
     friends: friends ?? this.friends,
     bills: bills ?? this.bills,
     expenses: expenses ?? this.expenses,
     payments: payments ?? this.payments,
     categories: categories ?? this.categories,
+    incomes: incomes ?? this.incomes,
   );
 
   /// [p] in [billId], no longer paying toward the expenses in [drop].
@@ -550,9 +616,10 @@ class Ledger {
         : [...items.take(index), item, ...items.skip(index + 1)];
   }
 
-  /// Version 3 added categories; version 4 lets a payment pay toward
-  /// several expenses.
-  static const version = 4;
+  /// Version 3 added categories, version 4 lets a payment pay toward
+  /// several expenses, and version 5 adds money in and categories left out
+  /// of spending.
+  static const version = 5;
 
   Map<String, Object?> toJson() => {
     'version': version,
@@ -561,6 +628,7 @@ class Ledger {
     'categories': [for (final c in categories) c.toJson()],
     'expenses': [for (final e in expenses) e.toJson()],
     'payments': [for (final p in payments) p.toJson()],
+    'incomes': [for (final i in incomes) i.toJson()],
   };
 
   factory Ledger.fromJson(Map<String, Object?> json) => Ledger(
@@ -577,6 +645,10 @@ class Ledger {
     categories: [
       for (final c in json['categories'] as List? ?? const [])
         Category.fromJson(_map(c)),
+    ],
+    incomes: [
+      for (final i in json['incomes'] as List? ?? const [])
+        Income.fromJson(_map(i)),
     ],
   );
 

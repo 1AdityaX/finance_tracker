@@ -49,6 +49,7 @@ class FirestoreCloud implements Cloud {
     'bills': 'created',
     'expenses': 'date',
     'payments': 'date',
+    'incomes': 'date',
   };
 
   @override

@@ -5,7 +5,14 @@ import 'ledger.dart';
 import 'store.dart';
 
 /// The kinds of record a ledger holds, as named in its JSON.
-const recordKinds = ['friends', 'bills', 'categories', 'expenses', 'payments'];
+const recordKinds = [
+  'friends',
+  'bills',
+  'categories',
+  'expenses',
+  'payments',
+  'incomes',
+];
 
 /// One record to save in the cloud, or to delete when [record] is null.
 typedef RecordChange = ({String kind, String id, Map<String, Object?>? record});

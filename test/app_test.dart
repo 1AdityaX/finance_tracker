@@ -840,16 +840,21 @@ void main() {
 
     await tester.tapText('New category');
     await tester.type('rent');
-    await tester.tapText('Add category');
+    await tester.next();
     expect(find.text('You already have a category called “rent”.'), findsOne);
     await tester.type('Food');
-    await tester.tapText('Add category');
+    await tester.next();
+    expect(find.text('Count it in your spending?'), findsOneWidget);
+    await tester.tapText('Yes, count it'); // Picking saves.
     expect(store.ledger.categories.map((c) => c.name), contains('Food'));
 
     await tester.tapText('Travel');
     await tester.type('Trips');
-    await tester.tapText('Save name');
+    await tester.next();
+    await tester.tapText('No, leave it out');
     expect(store.ledger.category('travel')!.name, 'Trips');
+    expect(store.ledger.category('travel')!.counted, isFalse);
+    expect(find.textContaining('not counted in spending'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Delete Trips'));
     await tester.pumpAndSettle();
@@ -1113,6 +1118,80 @@ void main() {
       expect(find.text('Back up to Google'), findsNothing);
       expect(find.text('Backup'), findsNothing);
     });
+  });
+
+  testWidgets('/income records money nobody owes back', (tester) async {
+    final store = await pumpApp(tester, ledgerWith());
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'income');
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(find.text('How much did you get?'), findsOneWidget);
+    await tester.type('1,00,000');
+    await tester.next();
+    await tester.type('Mom');
+    await tester.tapText('From “Mom”');
+    await tester.type('College fees');
+    await tester.next();
+    expect(find.text('Mom gave you'), findsOneWidget);
+    await tester.tapText('Record ₹1,00,000');
+    expect(store.ledger.incomes.single.note, 'College fees');
+    expect(find.text('You’re all settled up.'), findsOneWidget);
+    await tester.reveal(find.text('Mom gave you'));
+    expect(find.text('Mom gave you'), findsOneWidget);
+  });
+
+  testWidgets('college fees paid with money from home don’t swamp spending', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final thisMonth = DateTime(now.year, now.month);
+    await pumpApp(
+      tester,
+      ledgerWith(
+            expenses: [
+              expense(
+                name: 'Groceries',
+                amount: 200000,
+                parts: {me: 1},
+                date: thisMonth,
+              ),
+              expense(
+                id: 'e2',
+                name: 'Semester fees',
+                amount: 10000000,
+                parts: {me: 1},
+                categoryId: 'fees',
+                date: thisMonth,
+              ),
+            ],
+          )
+          .put(
+            category: const Category(id: 'fees', name: 'Fees', counted: false),
+          )
+          .put(
+            income: Income(
+              id: 'i1',
+              from: 'Mom',
+              amount: 10000000,
+              date: thisMonth,
+              note: 'College fees',
+            ),
+          ),
+    );
+    await tester.tapText('Spent in ${monthName(now)}');
+    expect(
+      find.text('You’ve spent ₹2,000 so far in ${monthName(now)}.'),
+      findsOneWidget,
+    );
+    expect(find.text('₹1,00,000 came in'), findsOneWidget);
+    expect(find.text('Plus ₹1,00,000 not counted'), findsOneWidget);
+    await tester.reveal(find.text('Not counted in spending'));
+    await tester.reveal(find.text('Semester fees'));
+    expect(find.text('Semester fees'), findsOneWidget);
+    await tester.reveal(find.text('Money in'));
+    await tester.reveal(find.text('Mom gave you'));
+    expect(find.textContaining('College fees'), findsWidgets);
   });
 }
 

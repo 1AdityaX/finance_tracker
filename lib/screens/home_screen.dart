@@ -42,7 +42,7 @@ final commands = [
   ),
   Command(
     'receive',
-    'Record money a friend sent you',
+    'Record money a friend paid you back',
     Icons.south_west,
     (ledger) => PaymentFlow(ledger, Direction.received),
   ),
@@ -51,6 +51,12 @@ final commands = [
     'Group expenses into a bill, like a trip',
     Icons.folder_open_outlined,
     BillFlow.new,
+  ),
+  Command(
+    'income',
+    'Record money you got that nobody owes back',
+    Icons.savings_outlined,
+    IncomeFlow.new,
   ),
   Command(
     'friend',
@@ -307,7 +313,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (ledger.friends.isEmpty &&
         ledger.bills.length == 1 &&
         ledger.expenses.isEmpty &&
-        ledger.categories.isEmpty) {
+        ledger.categories.isEmpty &&
+        ledger.incomes.isEmpty) {
       return _welcome();
     }
     final recent = ledger.recentFriends;
@@ -355,7 +362,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const SectionHeader('Bills'),
             for (final bill in ledger.billsInOrder) _billTile(ledger, bill),
             const SectionHeader('Recent'),
-            if (ledger.expenses.isEmpty && ledger.payments.isEmpty)
+            if (ledger.expenses.isEmpty &&
+                ledger.payments.isEmpty &&
+                ledger.incomes.isEmpty)
               const EmptyNote('Expenses and payments you add show up here.'),
           ],
         ),
@@ -363,6 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
           store: store,
           expenses: ledger.expenses,
           payments: ledger.payments,
+          incomes: ledger.incomes,
           limit: 5,
         ),
         if (backedUp) SliverList.list(children: backup),

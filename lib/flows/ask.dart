@@ -32,6 +32,7 @@ final class TextAsk extends Ask {
     this.text = '',
     this.placeholder,
     this.taken,
+    this.emptyPhrase,
   });
   String text;
   final String? placeholder;
@@ -39,13 +40,16 @@ final class TextAsk extends Ask {
   /// Returns a message when the name is already used.
   final String? Function(String name)? taken;
 
+  /// When set, leaving it empty is fine, and the answer then reads as this.
+  final String? emptyPhrase;
+
   @override
   String? get problem => text.trim().isEmpty
-      ? 'Type a name to continue.'
+      ? (emptyPhrase == null ? 'Type a name to continue.' : null)
       : taken?.call(text.trim());
 
   @override
-  String get phrase => text.trim();
+  String get phrase => text.trim().isEmpty ? emptyPhrase ?? '' : text.trim();
 }
 
 final class AmountAsk extends Ask {

@@ -90,6 +90,15 @@ void main() {
       expect(ledger.balance('rahul'), -10100);
     });
 
+    test('reads version 4 data, which had no money in', () {
+      final json = ledgerWith(expenses: [expense()]).toJson()
+        ..['version'] = 4
+        ..remove('incomes');
+      final ledger = decodeLedger(jsonEncode(json));
+      expect(ledger.incomes, isEmpty);
+      expect(ledger.categories.every((c) => c.counted), isTrue);
+    });
+
     test('refuses data from a newer version', () {
       expect(
         () => decodeLedger(jsonEncode({'version': 99})),

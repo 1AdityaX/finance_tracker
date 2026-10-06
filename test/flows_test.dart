@@ -527,6 +527,76 @@ void main() {
     });
   });
 
+  group('IncomeFlow', () {
+    test('records money in with an optional note', () {
+      final flow = IncomeFlow(ledgerWith())
+        ..amount.paise = 500000
+        ..from.selected = 'Rahul';
+      expect(flow.note.problem, isNull, reason: 'the note is optional');
+      expect(flow.note.phrase, 'no note');
+      expect(flow.asks.map((a) => a.problem), everyElement(isNull));
+      final saved = flow.save();
+      expect(saved.incomes.single.from, 'Rahul');
+      expect(saved.incomes.single.note, isNull);
+      expect(saved.balance('rahul'), 0, reason: 'nobody owes anything');
+      expect(flow.savedMessage, '₹5,000 from Rahul recorded');
+      expect(flow.review.single.single.value, '₹5,000');
+    });
+
+    test('offers past givers first, then friends, then names typed in', () {
+      final ledger = ledgerWith().put(
+        income: Income(id: 'i1', from: 'Mom', amount: 100, date: day),
+      );
+      final flow = IncomeFlow(ledger);
+      flow.from.selected = flow.from.creator!.create('Dad');
+      expect(flow.from.choices().map((c) => c.label), [
+        'Mom',
+        'Priya',
+        'Rahul',
+        'Dad',
+      ]);
+      flow
+        ..amount.paise = 10000000
+        ..note.text = 'College fees';
+      expect(flow.save().incomes.last.note, 'College fees');
+    });
+
+    test('editing replaces it, and it can be deleted', () {
+      final income = Income(id: 'i1', from: 'Mom', amount: 100, date: day);
+      final flow = IncomeFlow(
+        ledgerWith().put(income: income),
+        existing: income,
+      )..amount.paise = 200;
+      expect(flow.editing, isTrue);
+      expect(flow.save().incomes.single.amount, 200);
+      expect(flow.delete()!.ledger.incomes, isEmpty);
+      expect(flow.delete()!.message, '₹1 from Mom deleted');
+    });
+  });
+
+  group('CategoryFlow', () {
+    test('asks whether the category counts in spending', () {
+      final flow = CategoryFlow(ledgerWith())..name.text = 'Fees';
+      expect(flow.asks, [flow.name, flow.counted]);
+      expect(flow.counted.selected, 'yes');
+      flow.counted.selected = 'no';
+      expect(flow.save().categories.last.counted, isFalse);
+    });
+
+    test('an expense in an uncounted category says it is left out', () {
+      final ledger = ledgerWith().put(
+        category: const Category(id: 'fees', name: 'Fees', counted: false),
+      );
+      final flow = ExpenseFlow(ledger)
+        ..name.text = 'Semester fees'
+        ..amount.paise = 10000000
+        ..category.selected = 'fees';
+      final line = flow.review.last.single;
+      expect(line.label, 'Not counted in your spending');
+      expect(line.detail, 'Fees is left out');
+    });
+  });
+
   group('BillFlow and FriendFlow', () {
     test('reject names already in use, ignoring case', () {
       final bill = BillFlow(ledgerWith())..name.text = 'goa TRIP';

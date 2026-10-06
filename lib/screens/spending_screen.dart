@@ -46,10 +46,11 @@ class _SpendingScreenState extends State<SpendingScreen> {
     builder: (context, _) {
       final ledger = store.ledger;
       final spending = Spending(ledger, month);
-      // Pages run from the month of your first expense to this one.
-      final months = ledger.expenses.map(
-        (e) => DateTime(e.date.year, e.date.month),
-      );
+      // Pages run from the month of your first record to this one.
+      final months = [
+        for (final e in ledger.expenses) DateTime(e.date.year, e.date.month),
+        for (final i in ledger.incomes) DateTime(i.date.year, i.date.month),
+      ];
       final first = months.fold(_thisMonth, (a, b) => b.isBefore(a) ? b : a);
       final last = months.fold(_thisMonth, (a, b) => b.isAfter(a) ? b : a);
       // A breakdown of only "No category", or of one bill, says nothing.
@@ -100,7 +101,14 @@ class _SpendingScreenState extends State<SpendingScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: _headline(spending),
                 ),
-                if (_comparison(ledger, spending.total) case final text?)
+                for (final text in [
+                  ?_comparison(ledger, spending.total),
+                  if (spending.moneyIn > 0)
+                    '${rupees(spending.moneyIn)} came in',
+                  if (spending.uncounted.isNotEmpty)
+                    'Plus ${rupees(spending.uncounted.fold(0, (sum, i) => sum + i.share))} '
+                        'not counted',
+                ])
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                     child: Text(
@@ -175,6 +183,23 @@ class _SpendingScreenState extends State<SpendingScreen> {
               itemBuilder: (context, i) =>
                   _expenseTile(ledger, items[i], filter),
             ),
+            // Kept apart so they don't swamp what you spend day to day.
+            if (spending.uncounted.isNotEmpty)
+              SliverList.list(
+                children: [
+                  const SectionHeader('Not counted in spending'),
+                  for (final item in spending.uncounted)
+                    _expenseTile(ledger, item, null),
+                ],
+              ),
+            if (spending.incomes.isNotEmpty)
+              SliverList.list(
+                children: [
+                  const SectionHeader('Money in'),
+                  for (final income in spending.incomes)
+                    IncomeTile(store: store, income: income),
+                ],
+              ),
             const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
           ],
         ),

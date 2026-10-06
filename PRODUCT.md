@@ -30,8 +30,9 @@ Every action starts from a slash command (`/expense`, `/bill`, `/sent`, `/receiv
 
 - **Bill:** a named group of expenses, such as a trip or a dinner. A built-in bill called "General" always exists and is the default.
 - **Expense:** a name, a category (optional), a bill, the amount paid, a quantity (default 1), the friends involved, who paid (you or one of them), each person's share, and a date (today unless changed on the review). With no friends it is just yours, and who paid and the split are not asked. Shares can be split equally, by quantity (only when quantity is above 1), by percentage, or by exact rupees.
-- **Category:** a kind of spending, named by the user. The owner asked for no preset list (October 2026). Deleting one keeps its expenses, uncategorised.
-- **Spending:** your share of each expense in a calendar month, by category and by bill, compared with the month before. Money paid for friends and payments between friends are not spending.
+- **Category:** a kind of spending, named by the user. The owner asked for no preset list (October 2026). Deleting one keeps its expenses, uncategorised. A category can be left out of spending, for big costs someone else gave the money for, like college fees.
+- **Money in:** money the user got that nobody owes back (parents, gifts), with who gave it and an optional note. It never changes a balance.
+- **Spending:** your share of each expense in a calendar month, by category and by bill, compared with the month before. Money paid for friends, payments between friends, and categories left out of spending are not spending; the month also shows the money that came in.
 - **Sent / received payments:** an amount, a friend, a bill (General by default, searchable) and the expenses in that bill it pays toward (none, one or several, searchable). The amount goes to the ticked expenses in the order ticked, each up to what is still open; the rest counts toward the overall balance. Sent money reduces what you owe them. Received money reduces what they owe you.
 - Money is stored as integer paise (INR). Splits always add up exactly to the total.
 - Records can be corrected or deleted, and every change can be undone *(inferred: carried over from the previous app)*.

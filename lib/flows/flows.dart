@@ -179,26 +179,45 @@ class CategoryFlow extends _NameFlow {
           ? 'You already have a category called “$text”.'
           : null,
     );
+    counted = PickAsk(
+      'Count it in your spending?',
+      hint:
+          'Say no for big costs someone else gave you the money for, like '
+          'college fees, so they don’t swamp what you spend day to day.',
+      choices: () => const [
+        Choice('yes', 'Yes, count it'),
+        Choice('no', 'No, leave it out'),
+      ],
+      describe: (c) => c.id == 'yes' ? 'counted' : 'not counted',
+      selected: (existing?.counted ?? true) ? 'yes' : 'no',
+    );
   }
   final Category? existing;
+  late final PickAsk counted;
 
   /// What expenses without a category are listed under.
   static const noCategory = 'No category';
 
   @override
-  String get title => existing == null ? 'New category' : 'Rename category';
+  List<Ask> get asks => [name, counted];
 
   @override
-  String get saveLabel => existing == null ? 'Add category' : 'Save name';
+  String get title => existing == null ? 'New category' : 'Edit category';
 
   @override
-  String get savedMessage => existing == null
-      ? '“${name.phrase}” added'
-      : 'Renamed to “${name.phrase}”';
+  String get saveLabel => existing == null ? 'Add category' : 'Save changes';
+
+  @override
+  String get savedMessage =>
+      existing == null ? '“${name.phrase}” added' : '“${name.phrase}” updated';
 
   @override
   Ledger save([Ledger? onto]) => (onto ?? ledger).put(
-    category: Category(id: existing?.id ?? newId(), name: name.phrase),
+    category: Category(
+      id: existing?.id ?? newId(),
+      name: name.phrase,
+      counted: counted.selected == 'yes',
+    ),
   );
 }
 
@@ -455,16 +474,23 @@ class ExpenseFlow extends CommandFlow with _Creates {
               ].join(' · '),
             ),
       ],
-      if ((shares[me] ?? 0) > 0)
+      if (shares[me] case final share? when share > 0)
         [
-          Line(
-            [
-              'Spent in ${monthName(expense.date)}',
-              if (expense.date.year != DateTime.now().year) expense.date.year,
-            ].join(' '),
-            rupees(Spending(after, expense.date).total),
-            detail: 'Including this',
-          ),
+          switch (after.category(expense.categoryId)) {
+            Category(counted: false, :final name) => Line(
+              'Not counted in your spending',
+              rupees(share),
+              detail: '$name is left out',
+            ),
+            _ => Line(
+              [
+                'Spent in ${monthName(expense.date)}',
+                if (expense.date.year != DateTime.now().year) expense.date.year,
+              ].join(' '),
+              rupees(Spending(after, expense.date).total),
+              detail: 'Including this',
+            ),
+          },
         ],
     ];
   }
@@ -701,6 +727,111 @@ class PaymentFlow extends CommandFlow with _Creates {
           ledger: (onto ?? ledger).removePayment(existing!.id),
           message: 'Payment deleted',
         );
+}
+
+/// Money you got that nobody owes back, like pocket money or a gift.
+class IncomeFlow extends CommandFlow {
+  IncomeFlow(super.ledger, {this.existing}) {
+    final i = existing;
+    amount = AmountAsk('How much did you get?', paise: i?.amount);
+    from = PickAsk(
+      'Who gave it to you?',
+      hint:
+          'For money nobody owes back, like pocket money or a gift. When a '
+          'friend pays you back, use /receive instead.',
+      choices: () => [for (final name in _sources) Choice(name, name)],
+      describe: (c) => 'from ${c.label}',
+      selected: i?.from,
+      creator: Creator(
+        placeholder: 'Search or type who gave it',
+        label: (name) => 'From “$name”',
+        create: (name) {
+          _typed.add(name);
+          return name;
+        },
+      ),
+    );
+    note = TextAsk(
+      'What is it for?',
+      hint: 'Optional, like college fees or pocket money.',
+      placeholder: 'College fees',
+      text: i?.note ?? '',
+      emptyPhrase: 'no note',
+    );
+    date = i?.date ?? DateTime.now();
+  }
+
+  final Income? existing;
+  late final AmountAsk amount;
+  late final PickAsk from;
+  late final TextAsk note;
+  final _typed = <String>[];
+
+  /// People you've had money from, then friends, then names typed here.
+  List<String> get _sources {
+    final seen = <String>{};
+    return [
+      for (final name in [
+        ...ledger.incomeSources,
+        for (final f in ledger.recentFriends) f.name,
+        ..._typed,
+      ])
+        if (seen.add(name.toLowerCase())) name,
+    ];
+  }
+
+  @override
+  bool get editing => existing != null;
+
+  @override
+  String get title => editing ? 'Edit money in' : 'Money in';
+
+  @override
+  List<Ask> get asks => [amount, from, note];
+
+  @override
+  String get saveLabel => editing ? 'Save changes' : 'Record ${amount.phrase}';
+
+  @override
+  String get savedMessage => editing
+      ? 'Money in updated'
+      : '${amount.phrase} from ${from.selected} recorded';
+
+  Income get _income => Income(
+    id: existing?.id ?? newId(),
+    from: from.selected!,
+    amount: amount.paise!,
+    date: date!,
+    note: note.text.trim().isEmpty ? null : note.text.trim(),
+  );
+
+  @override
+  Ledger save([Ledger? onto]) => (onto ?? ledger).put(income: _income);
+
+  @override
+  ({String title, int amount}) get heading =>
+      (title: '${from.selected} gave you', amount: amount.paise!);
+
+  @override
+  List<List<Line>> get review => [
+    [
+      Line(
+        'Money in, ${monthName(date!)}',
+        rupees(Spending(save(), date!).moneyIn),
+        detail: 'Including this',
+      ),
+    ],
+  ];
+
+  @override
+  ({Ledger ledger, String message})? delete([Ledger? onto]) =>
+      switch (existing) {
+        null => null,
+        final i => (
+          ledger: (onto ?? ledger).removeIncome(i.id),
+          message: '${rupees(i.amount)} from ${i.from} deleted',
+        ),
+      };
 }
 
 /// "Rahul", "Rahul and Priya", "Rahul, Priya and 2 others".

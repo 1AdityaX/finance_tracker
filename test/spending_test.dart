@@ -75,4 +75,54 @@ void main() {
     expect(monthName(october), 'October');
     expect(monthName(DateTime(2026, 1, 31)), 'January');
   });
+
+  test('leaves out categories not counted, and lists them apart', () {
+    final ledger =
+        ledgerWith(
+          expenses: [
+            expense(amount: 30000, parts: {me: 1}, categoryId: 'travel'),
+            expense(
+              id: 'fees',
+              amount: 10000000,
+              parts: {me: 1},
+              categoryId: 'fees',
+            ),
+          ],
+        ).put(
+          category: const Category(id: 'fees', name: 'Fees', counted: false),
+        );
+    final spending = Spending(ledger, october);
+    expect(spending.total, 30000);
+    expect(spending.byCategory.map((r) => r.id), ['travel']);
+    expect(spending.uncounted.map((i) => (i.expense.id, i.share)), [
+      ('fees', 10000000),
+    ]);
+  });
+
+  test('adds up the money that came in that month', () {
+    final ledger = ledgerWith()
+        .put(
+          income: Income(id: 'i1', from: 'Dad', amount: 500000, date: day),
+        )
+        .put(
+          income: Income(
+            id: 'i2',
+            from: 'Mom',
+            amount: 10000000,
+            date: DateTime(2026, 10, 3),
+          ),
+        )
+        .put(
+          income: Income(
+            id: 'i3',
+            from: 'Mom',
+            amount: 100,
+            date: DateTime(2026, 9, 30),
+          ),
+        );
+    final spending = Spending(ledger, october);
+    expect(spending.moneyIn, 10500000);
+    expect(spending.incomes.map((i) => i.id), ['i2', 'i1']);
+    expect(spending.total, 0, reason: 'money in is not spending');
+  });
 }

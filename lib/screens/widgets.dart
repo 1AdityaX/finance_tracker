@@ -174,14 +174,15 @@ class TrailingAmount extends StatelessWidget {
   }
 }
 
-/// Expenses and payments, newest first, as tappable rows that open the
-/// record for editing. A sliver, so long histories only build what shows.
+/// Expenses, payments and money in, newest first, as tappable rows that open
+/// the record for editing. A sliver, so long histories only build what shows.
 class ActivityList extends StatelessWidget {
   const ActivityList({
     super.key,
     required this.store,
     required this.expenses,
     required this.payments,
+    this.incomes = const [],
     this.friendId,
     this.showBill = true,
     this.limit,
@@ -189,6 +190,7 @@ class ActivityList extends StatelessWidget {
   final Store store;
   final Iterable<Expense> expenses;
   final Iterable<Payment> payments;
+  final Iterable<Income> incomes;
 
   /// When set, expense rows show what this friend owes you (+) or you owe
   /// them (−) for each expense.
@@ -202,9 +204,10 @@ class ActivityList extends StatelessWidget {
     final open = friendId == null
         ? const <String, int>{}
         : store.ledger.expenseBalances(friendId!);
-    final rows = [
-      for (final e in expenses) (date: e.date, expense: e, payment: null),
-      for (final p in payments) (date: p.date, expense: null, payment: p),
+    final rows = <({DateTime date, Object record})>[
+      for (final e in expenses) (date: e.date, record: e),
+      for (final p in payments) (date: p.date, record: p),
+      for (final i in incomes) (date: i.date, record: i),
     ]..sort((a, b) => b.date.compareTo(a.date));
     final ledger = store.ledger;
     final bills = {for (final b in ledger.bills) b.id: b.name};
@@ -212,21 +215,19 @@ class ActivityList extends StatelessWidget {
     final expenseNames = {for (final e in ledger.expenses) e.id: e.name};
     return SliverList.builder(
       itemCount: limit == null ? rows.length : rows.length.clamp(0, limit!),
-      itemBuilder: (context, i) {
-        final row = rows[i];
-        if (row.expense case final e?) {
-          return _expenseTile(
-            context,
-            e,
-            bills[e.billId],
-            categories[e.categoryId],
-            open[e.id] ?? 0,
-          );
-        }
-        final p = row.payment!;
-        return _paymentTile(context, p, bills[p.billId], [
+      itemBuilder: (context, i) => switch (rows[i].record) {
+        final Expense e => _expenseTile(
+          context,
+          e,
+          bills[e.billId],
+          categories[e.categoryId],
+          open[e.id] ?? 0,
+        ),
+        final Payment p => _paymentTile(context, p, bills[p.billId], [
           for (final id in p.settles.keys) ?expenseNames[id],
-        ]);
+        ]),
+        final Income income => IncomeTile(store: store, income: income),
+        _ => const SizedBox.shrink(),
       },
     );
   }
@@ -328,6 +329,27 @@ class IconBadge extends StatelessWidget {
       child: Icon(icon, size: 20, color: scheme.primary),
     );
   }
+}
+
+/// Money in, as a row that opens it for editing.
+class IncomeTile extends StatelessWidget {
+  const IncomeTile({super.key, required this.store, required this.income});
+  final Store store;
+  final Income income;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: const IconBadge(Icons.savings_outlined),
+    title: Text(
+      '${income.from} gave you',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    subtitle: Text([?income.note, shortDate(income.date)].join(' · ')),
+    trailing: TrailingAmount(rupees(income.amount)),
+    onTap: () =>
+        startFlow(context, store, IncomeFlow(store.ledger, existing: income)),
+  );
 }
 
 /// A short message shown where a list has nothing to show yet.

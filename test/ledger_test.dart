@@ -330,4 +330,32 @@ void main() {
     expect(expense().personal, isFalse);
     expect(expense(payerId: 'rahul', parts: {me: 1}).personal, isFalse);
   });
+
+  test('money in and uncounted categories round-trip through JSON', () {
+    final ledger = ledgerWith()
+        .put(
+          category: const Category(id: 'fees', name: 'Fees', counted: false),
+        )
+        .put(
+          income: Income(
+            id: 'i1',
+            from: 'Mom',
+            amount: 10000000,
+            date: day,
+            note: 'College fees',
+          ),
+        )
+        .put(
+          income: Income(id: 'i2', from: 'Dad', amount: 500000, date: day),
+        );
+    final copy = Ledger.fromJson(
+      (jsonDecode(jsonEncode(ledger.toJson())) as Map).cast<String, Object?>(),
+    );
+    expect(copy.category('fees')!.counted, isFalse);
+    expect(copy.category('travel')!.counted, isTrue);
+    expect(copy.income('i1')!.note, 'College fees');
+    expect(copy.income('i2')!.note, isNull);
+    expect(copy.incomeSources, unorderedEquals(['Mom', 'Dad']));
+    expect(copy.removeIncome('i1').incomes.single.id, 'i2');
+  });
 }
