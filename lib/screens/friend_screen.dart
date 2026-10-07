@@ -41,6 +41,7 @@ class FriendScreen extends StatelessWidget {
       final theme = Theme.of(context);
       final balance = ledger.balance(friend.id);
       final byBill = ledger.billBalances(friend.id);
+      final open = _openItems(ledger, friend.id);
       final bills = [
         for (final bill in ledger.billsInOrder)
           if (byBill[bill.id] case final balance? when balance != 0)
@@ -138,6 +139,11 @@ class FriendScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (open.isNotEmpty) ...[
+                  const SectionHeader('Still open'),
+                  for (final item in open)
+                    _openTile(context, ledger, friend, item),
+                ],
                 if (bills.length > 1 ||
                     bills.any((b) => b.bill.id != generalBill)) ...[
                   const SectionHeader('By bill'),
@@ -166,4 +172,66 @@ class FriendScreen extends StatelessWidget {
       );
     },
   );
+
+  /// Each expense with money still open between you and [friendId], oldest
+  /// first, then any payment money not linked to an expense, so the rows add
+  /// up to the balance.
+  List<({Expense? expense, int open})> _openItems(
+    Ledger ledger,
+    String friendId,
+  ) {
+    final balances = ledger.expenseBalances(friendId);
+    final items = [
+      for (final e in ledger.expenses)
+        if (balances[e.id] case final open? when open != 0)
+          (expense: e, open: open),
+    ]..sort((a, b) => a.expense.date.compareTo(b.expense.date));
+    final unlinked =
+        ledger.balance(friendId) -
+        items.fold<int>(0, (sum, item) => sum + item.open);
+    return [
+      for (final item in items) (expense: item.expense, open: item.open),
+      if (unlinked != 0) (expense: null, open: unlinked),
+    ];
+  }
+
+  Widget _openTile(
+    BuildContext context,
+    Ledger ledger,
+    Friend friend,
+    ({Expense? expense, int open}) item,
+  ) {
+    final amount = TrailingAmount(
+      rupees(item.open.abs()),
+      sign: item.open.sign,
+    );
+    final e = item.expense;
+    if (e == null) {
+      return ListTile(
+        leading: const IconBadge(Icons.payments_outlined),
+        title: const Text('Not linked to an expense'),
+        subtitle: Text(
+          item.open < 0
+              ? 'Paid by ${friend.name} without picking what for'
+              : 'Sent by you without picking what for',
+        ),
+        trailing: amount,
+      );
+    }
+    final owed = e.owedBy(friend.id);
+    final paid = owed - item.open;
+    return ListTile(
+      leading: const IconBadge(Icons.receipt_long_outlined),
+      title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        [
+          shortDate(e.date),
+          if (paid != 0) '${rupees(paid.abs())} of ${rupees(owed.abs())} paid',
+          if (item.open < 0) 'you owe',
+        ].join(' · '),
+      ),
+      trailing: amount,
+      onTap: () => startFlow(context, store, ExpenseFlow(ledger, existing: e)),
+    );
+  }
 }

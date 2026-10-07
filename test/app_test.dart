@@ -378,6 +378,34 @@ void main() {
     expect(find.textContaining('₹150 left'), findsOneWidget);
   });
 
+  testWidgets('a friend page lists what is still open, and when', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      ledgerWith(
+        expenses: [
+          expense(),
+          expense(id: 'e2', name: 'Cab', amount: 40000),
+          expense(id: 'e3', name: 'Lunch', amount: 30000, payerId: 'rahul'),
+        ],
+        payments: [
+          payment(amount: 60000, expenseId: 'e1'),
+          payment(id: 'p2', amount: 5000, expenseId: 'e2'),
+          payment(id: 'p3', amount: 1000),
+        ],
+      ),
+    );
+    await tester.tapText('Rahul');
+    expect(find.text('Still open'), findsOneWidget);
+    // Dinner is settled, so only the Cab, the Lunch Rahul paid for, and the
+    // payment not linked to anything are listed.
+    expect(find.textContaining('₹50 of ₹200 paid'), findsOneWidget);
+    expect(find.textContaining('you owe'), findsOneWidget);
+    expect(find.text('Not linked to an expense'), findsOneWidget);
+    expect(find.textContaining('of ₹600 paid'), findsNothing);
+  });
+
   testWidgets('the keyboard stays with the next typed answer', (tester) async {
     await pumpApp(tester, ledgerWith());
     await tester.tapText('/expense');

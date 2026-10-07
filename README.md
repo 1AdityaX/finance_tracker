@@ -32,6 +32,8 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 
 Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
+A friend's page lists what is still open between you, oldest first: each expense with its date, how much of their share is paid, and what is left. Money paid without picking an expense is listed on its own, so the rows add up to the balance.
+
 ## Spending
 
 `/spending`, or the "Spent in" row on home, shows one month:
@@ -104,7 +106,7 @@ lib/
     flow_screen.dart     Runs a flow: step bar, answer chips, review, saving
     ask_views.dart       The input for each question type
     home_screen.dart     Balances, bills, recent activity, and the command bar
-    friend_screen.dart   One friend's balance and history
+    friend_screen.dart   One friend's balance, what is still open, and history
     bill_screen.dart     One bill's expenses and balances
     spending_screen.dart A month of spending: total, comparison, bars, expenses
     categories_screen.dart  The list of categories
