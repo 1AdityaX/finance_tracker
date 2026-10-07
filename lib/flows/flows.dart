@@ -420,6 +420,9 @@ class ExpenseFlow extends CommandFlow with _Creates {
       parts: shared ? split.parts! : const {me: 1},
       date: date!,
       categoryId: category.selected!.isEmpty ? null : category.selected,
+      items: shared && split.mode == SplitMode.items
+          ? split.savedItems
+          : const [],
     );
   }
 
@@ -446,6 +449,16 @@ class ExpenseFlow extends CommandFlow with _Creates {
     final after = save();
     final shares = expense.shares;
     return [
+      // Each item and who shared it, so everyone can see how it was split.
+      if (expense.items.isNotEmpty)
+        [
+          for (final item in expense.items)
+            Line(
+              item.name,
+              rupees(item.amount),
+              detail: item.people.map(nameOf).join(', '),
+            ),
+        ],
       // An expense that was just yours costs you all of it, as shown above.
       if (!expense.personal)
         [
@@ -457,6 +470,13 @@ class ExpenseFlow extends CommandFlow with _Creates {
                 SplitMode.quantity =>
                   '${expense.parts[id]} of ${expense.quantity}',
                 SplitMode.percent => '${hundredthsText(expense.parts[id]!)}%',
+                SplitMode.items => switch ([
+                  for (final item in expense.items)
+                    if (item.people.contains(id)) item.name,
+                ]) {
+                  [] => 'No items',
+                  final items => items.join(', '),
+                },
                 SplitMode.equal || SplitMode.exact => null,
               },
             ),

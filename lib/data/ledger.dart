@@ -115,6 +115,49 @@ enum SplitMode {
 
   /// Parts are paise and add up to [Expense.amount].
   exact,
+
+  /// Each of [Expense.items] is split equally between the people in it.
+  /// Parts are what that comes to for each person, in paise, as for [exact].
+  items,
+}
+
+/// One thing on a bill, shared equally by the people in it, like a tea
+/// only Aayush had or an omelette you and a friend split.
+class Item {
+  const Item({required this.name, required this.amount, required this.people});
+  final String name;
+
+  /// In paise.
+  final int amount;
+
+  /// Who shared it: [me] or friend ids.
+  final List<String> people;
+
+  /// What each person in it pays, in paise.
+  Map<String, int> get shares =>
+      apportion(amount, {for (final id in people) id: 1});
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'amount': amount,
+    'people': people,
+  };
+  factory Item.fromJson(Map<String, Object?> json) => Item(
+    name: json['name']! as String,
+    amount: json['amount']! as int,
+    people: (json['people']! as List).cast<String>(),
+  );
+}
+
+/// What each person's items come to, in paise, for a split by item.
+Map<String, int> itemParts(List<Item> items) {
+  final parts = <String, int>{};
+  for (final item in items) {
+    for (final MapEntry(:key, :value) in item.shares.entries) {
+      parts[key] = (parts[key] ?? 0) + value;
+    }
+  }
+  return parts;
 }
 
 /// What each person's part costs, in paise, for an expense of [amount].
@@ -123,7 +166,7 @@ Map<String, int> sharesOf(
   int amount,
   Map<String, int> parts,
 ) => switch (split) {
-  SplitMode.exact => parts,
+  SplitMode.exact || SplitMode.items => parts,
   SplitMode.equal => apportion(amount, {for (final id in parts.keys) id: 1}),
   SplitMode.quantity || SplitMode.percent => apportion(amount, parts),
 };
@@ -140,6 +183,7 @@ class Expense {
     required this.parts,
     required this.date,
     this.categoryId,
+    this.items = const [],
   });
   final String id;
   final String billId;
@@ -157,6 +201,9 @@ class Expense {
   final Map<String, int> parts;
   final DateTime date;
   final String? categoryId;
+
+  /// What was bought, when it is split by item.
+  final List<Item> items;
 
   /// Just yours: you paid and nobody shared it.
   bool get personal => payerId == me && parts.keys.every((id) => id == me);
@@ -184,6 +231,7 @@ class Expense {
     'parts': parts,
     'date': date.toIso8601String(),
     'category': ?categoryId,
+    if (items.isNotEmpty) 'items': [for (final i in items) i.toJson()],
   };
   factory Expense.fromJson(Map<String, Object?> json) => Expense(
     id: json['id']! as String,
@@ -196,6 +244,10 @@ class Expense {
     parts: (json['parts']! as Map).cast<String, int>(),
     date: DateTime.parse(json['date']! as String),
     categoryId: json['category'] as String?,
+    items: [
+      for (final i in json['items'] as List? ?? const [])
+        Item.fromJson((i as Map).cast<String, Object?>()),
+    ],
   );
 }
 
@@ -618,7 +670,7 @@ class Ledger {
   /// Version 3 added categories, version 4 lets a payment pay toward
   /// several expenses, and version 5 adds money in and categories left out
   /// of spending.
-  static const version = 5;
+  static const version = 6;
 
   Map<String, Object?> toJson() => {
     'version': version,

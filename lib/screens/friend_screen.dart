@@ -226,6 +226,14 @@ class FriendScreen extends StatelessWidget {
       subtitle: Text(
         [
           shortDate(e.date),
+          // For a split by item, what they had.
+          ...switch ([
+            for (final i in e.items)
+              if (i.people.contains(friend.id)) i.name,
+          ]) {
+            [] => const <String>[],
+            final had => [had.join(', ')],
+          },
           if (paid != 0) '${rupees(paid.abs())} of ${rupees(owed.abs())} paid',
           if (item.open < 0) 'you owe',
         ].join(' · '),

@@ -737,10 +737,14 @@ class _SplitViewState extends State<_SplitView> {
                       SplitMode.quantity => 'By quantity',
                       SplitMode.percent => 'By percentage',
                       SplitMode.exact => 'By amount',
+                      SplitMode.items => 'By item',
                     }),
                     selected: ask.mode == mode,
                     onSelected: (_) {
                       ask.mode = mode;
+                      if (mode == SplitMode.items && ask.items.isEmpty) {
+                        ask.addItem();
+                      }
                       widget.onChanged();
                     },
                   ),
@@ -748,9 +752,47 @@ class _SplitViewState extends State<_SplitView> {
             ),
           ),
         ),
-        SliverToBoxAdapter(child: _status(theme, shares)),
+        // Below a list of items, where it stays in view while they change.
+        if (ask.mode != SplitMode.items)
+          SliverToBoxAdapter(child: _status(theme, shares)),
+        if (ask.mode == SplitMode.items) ...[
+          SliverList.list(
+            children: [
+              for (final (i, item) in ask.items.indexed)
+                _itemCard(theme, i, item, people),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      ask.addItem();
+                      widget.onChanged();
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add item'),
+                  ),
+                ),
+              ),
+              _status(theme, shares),
+              if (shares != null) ...[
+                for (final id in people)
+                  ListTile(
+                    leading: Avatar(ask.nameOf(id)),
+                    title: Text(ask.nameOf(id)),
+                    trailing: Text(
+                      rupees(shares[id] ?? 0),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontFeatures: tabular,
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ]
         // No rows for a mode that no longer applies; its problem says why.
-        if (ask.modes.contains(ask.mode))
+        else if (ask.modes.contains(ask.mode))
           SliverList.list(
             children: [for (final id in people) _row(theme, id, shares?[id])],
           ),
@@ -788,6 +830,120 @@ class _SplitViewState extends State<_SplitView> {
       ),
     );
   }
+
+  TextEditingController _itemController(ItemDraft item, String field) =>
+      _controllers.putIfAbsent('item/${item.key}/$field', () {
+        return TextEditingController(
+          text: field == 'name'
+              ? item.name
+              : item.paise == null
+              ? ''
+              : hundredthsText(item.paise!),
+        );
+      });
+
+  /// One item: what it was, what it cost, and who shared it.
+  Widget _itemCard(
+    ThemeData theme,
+    int index,
+    ItemDraft item,
+    List<String> people,
+  ) => Card.outlined(
+    margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 4, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _itemController(item, 'name'),
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Item ${index + 1}',
+                  ),
+                  onChanged: (text) {
+                    item.name = text;
+                    widget.onChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 110,
+                child: TextField(
+                  controller: _itemController(item, 'amount'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [_decimal],
+                  textAlign: TextAlign.end,
+                  textInputAction: TextInputAction.done,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontFeatures: tabular,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: const _Unit('₹'),
+                    prefixIconConstraints: const BoxConstraints(),
+                    hintText: item == ask.items.last && ask.left > 0
+                        ? hundredthsText(ask.left)
+                        : '0',
+                  ),
+                  onChanged: (text) {
+                    item.paise = parseHundredths(text);
+                    widget.onChanged();
+                  },
+                ),
+              ),
+              IconButton(
+                tooltip:
+                    'Remove ${item.name.trim().isEmpty ? 'item ${index + 1}' : item.name.trim()}',
+                onPressed: () {
+                  ask.items.remove(item);
+                  widget.onChanged();
+                },
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final id in people)
+                FilterChip(
+                  label: Text(ask.nameOf(id)),
+                  selected: item.people.contains(id),
+                  onSelected: (on) {
+                    on ? item.people.add(id) : item.people.remove(id);
+                    widget.onChanged();
+                  },
+                ),
+            ],
+          ),
+          if (item.people.length > 1 && (item.paise ?? 0) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                item.people.length == 2
+                    ? '${rupees(item.paise! ~/ 2)} each'
+                    : 'About ${rupees(item.paise! ~/ item.people.length)} each',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontFeatures: tabular,
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 
   /// Units shown for [id]: typed, or the remainder for the one left blank.
   int _units(String id) =>
@@ -847,6 +1003,8 @@ class _SplitViewState extends State<_SplitView> {
             ],
           ),
         );
+      case SplitMode.items:
+        return const SizedBox.shrink();
       case SplitMode.percent || SplitMode.exact:
         final percent = ask.mode == SplitMode.percent;
         return ListTile(

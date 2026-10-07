@@ -165,6 +165,21 @@ final class MultiPickAsk extends Ask {
   String get phrase => describe(chosen);
 }
 
+/// One thing on a bill while it is being entered for a split by item.
+class ItemDraft {
+  ItemDraft(this.key, {this.name = '', this.paise, Iterable<String>? people})
+    : people = {...?people};
+
+  /// Tells drafts apart while their text changes, for the fields that edit
+  /// them.
+  final int key;
+  String name;
+  int? paise;
+
+  /// Who shared it.
+  final Set<String> people;
+}
+
 /// How an amount is divided between people, with a value per person.
 final class SplitAsk extends Ask {
   SplitAsk(
@@ -178,10 +193,18 @@ final class SplitAsk extends Ask {
   }) {
     if (from == null) return;
     mode = from.split;
-    if (from.split == SplitMode.equal) {
-      excluded.addAll(people().where((id) => !from.parts.containsKey(id)));
-    } else {
-      values[from.split]!.addAll(from.parts);
+    switch (from.split) {
+      case SplitMode.equal:
+        excluded.addAll(people().where((id) => !from.parts.containsKey(id)));
+      case SplitMode.items:
+        for (final item in from.items) {
+          addItem()
+            ..name = item.name
+            ..paise = item.amount
+            ..people.addAll(item.people);
+        }
+      case SplitMode.quantity || SplitMode.percent || SplitMode.exact:
+        values[from.split]!.addAll(from.parts);
     }
     accept();
   }
@@ -213,7 +236,35 @@ final class SplitAsk extends Ask {
     if (quantity() > 1) SplitMode.quantity,
     SplitMode.percent,
     SplitMode.exact,
+    SplitMode.items,
   ];
+
+  /// What was bought, for a split by item, in the order entered.
+  final items = <ItemDraft>[];
+  var _nextKey = 0;
+
+  /// Adds an empty item to the end and returns it.
+  ItemDraft addItem() {
+    final item = ItemDraft(_nextKey++);
+    items.add(item);
+    return item;
+  }
+
+  /// The items to save: each named, with only people still in the expense.
+  List<Item> get savedItems {
+    final everyone = people();
+    return [
+      for (final (i, item) in items.indexed)
+        Item(
+          name: item.name.trim().isEmpty ? 'Item ${i + 1}' : item.name.trim(),
+          amount: item.paise ?? 0,
+          people: [
+            for (final id in everyone)
+              if (item.people.contains(id)) id,
+          ],
+        ),
+    ];
+  }
 
   /// People left out of an equal split.
   final excluded = <String>{};
@@ -231,18 +282,21 @@ final class SplitAsk extends Ask {
     SplitMode.equal => 0,
     SplitMode.quantity => quantity(),
     SplitMode.percent => 10000,
-    SplitMode.exact => amount(),
+    SplitMode.exact || SplitMode.items => amount(),
   };
 
   /// What is still unassigned; negative when too much is assigned.
   int get left {
+    if (mode == SplitMode.items) {
+      return amount() - items.fold<int>(0, (sum, i) => sum + (i.paise ?? 0));
+    }
     final typed = values[mode] ?? const {};
     return target - people().fold<int>(0, (sum, id) => sum + (typed[id] ?? 0));
   }
 
   /// The one person with no value yet, who gets whatever is left.
   String? get filler {
-    if (mode == SplitMode.equal) return null;
+    if (mode == SplitMode.equal || mode == SplitMode.items) return null;
     final empty = people().where((id) => !values[mode]!.containsKey(id));
     return empty.length == 1 && left >= 0 ? empty.single : null;
   }
@@ -254,11 +308,36 @@ final class SplitAsk extends Ask {
       final included = people().where((id) => !excluded.contains(id));
       return included.isEmpty ? null : {for (final id in included) id: 1};
     }
+    if (mode == SplitMode.items) {
+      return _itemProblem == null ? _itemParts : null;
+    }
     final typed = values[mode]!;
     final result = {for (final id in people()) id: typed[id] ?? 0};
     if (filler case final id?) result[id] = left;
     final sum = result.values.fold<int>(0, (a, b) => a + b);
     return sum == target && target > 0 ? result : null;
+  }
+
+  /// Everyone in the expense mapped to what their items come to, so nobody
+  /// drops out of it for having no items yet.
+  Map<String, int> get _itemParts => {
+    for (final id in people()) id: 0,
+    ...itemParts(savedItems),
+  };
+
+  /// Why the items can't be saved yet, or null when they add up.
+  String? get _itemProblem {
+    if (items.isEmpty) return 'Add what was bought to continue.';
+    for (final item in savedItems) {
+      if (item.amount <= 0) return '“${item.name}” needs an amount.';
+      if (item.people.isEmpty) return 'Pick who shared “${item.name}”.';
+    }
+    if (left != 0) {
+      return left > 0
+          ? '${rupees(left)} still to assign.'
+          : '${rupees(-left)} more than the total.';
+    }
+    return null;
   }
 
   /// What each person pays, or null while the parts don't add up.
@@ -272,7 +351,7 @@ final class SplitAsk extends Ask {
     SplitMode.equal => '',
     SplitMode.quantity => value == 1 ? '1 unit' : '$value units',
     SplitMode.percent => '${hundredthsText(value)}%',
-    SplitMode.exact => rupees(value),
+    SplitMode.exact || SplitMode.items => rupees(value),
   };
 
   @override
@@ -283,6 +362,7 @@ final class SplitAsk extends Ask {
           'Choose another way to split it.';
     }
     if (mode == SplitMode.equal) return 'Include at least one person.';
+    if (mode == SplitMode.items) return _itemProblem;
     return left >= 0
         ? '${format(left)} still to assign.'
         : '${format(-left)} more than the total.';
@@ -318,6 +398,10 @@ final class SplitAsk extends Ask {
     SplitMode.quantity => 'split by quantity',
     SplitMode.percent => 'split by percentage',
     SplitMode.exact => 'split by amount',
+    SplitMode.items => switch (items.length) {
+      1 => 'split by 1 item',
+      final n => 'split by $n items',
+    },
   };
 }
 

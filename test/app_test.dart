@@ -145,6 +145,58 @@ void main() {
     expect(find.textContaining('Rahul owes you'), findsWidgets);
   });
 
+  testWidgets('an expense can be split item by item', (tester) async {
+    final store = await pumpApp(tester, ledgerWith());
+    await tester.tapText('/expense');
+    await tester.type('Snacks');
+    await tester.next();
+    await tester.next(); // No category.
+    await tester.next(); // General.
+    await tester.type('100');
+    await tester.next();
+    await tester.next(); // 1 unit.
+    await tester.tapText('Rahul');
+    await tester.next();
+    await tester.tapText('You');
+
+    await tester.tapText('By item');
+    await tester.reveal(find.text('“Item 1” needs an amount.'));
+    expect(find.text('“Item 1” needs an amount.'), findsOneWidget);
+    final fields = find.descendant(
+      of: find.byType(Card),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(fields.at(0), 'Omelette');
+    await tester.enterText(fields.at(1), '80');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, 'You').first);
+    await tester.tap(find.widgetWithText(FilterChip, 'Rahul').first);
+    await tester.pumpAndSettle();
+    expect(find.text('₹40 each'), findsOneWidget);
+    await tester.reveal(find.text('₹20 still to assign.'));
+    expect(find.text('₹20 still to assign.'), findsOneWidget);
+
+    await tester.tapText('Add item');
+    await tester.enterText(fields.at(2), 'Tea');
+    await tester.enterText(fields.at(3), '20');
+    await tester.pumpAndSettle();
+    final rahul = find.widgetWithText(FilterChip, 'Rahul').last;
+    await tester.ensureVisible(rahul);
+    await tester.pumpAndSettle();
+    await tester.tap(rahul);
+    await tester.pumpAndSettle();
+    await tester.reveal(find.text('All ₹100 assigned'));
+    expect(find.text('All ₹100 assigned'), findsOneWidget);
+    await tester.next();
+
+    expect(find.text('Omelette, Tea'), findsOneWidget);
+    expect(find.text('Rahul owes you'), findsOneWidget);
+    await tester.tapText('Add expense');
+    final saved = store.ledger.expenses.single;
+    expect(saved.shares, {me: 4000, 'rahul': 6000});
+    expect(saved.items.map((i) => i.name), ['Omelette', 'Tea']);
+  });
+
   testWidgets('back returns to the previous question with answers kept', (
     tester,
   ) async {

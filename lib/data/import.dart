@@ -144,6 +144,14 @@ ImportPreview previewImport(Ledger current, String source) {
         },
         date: e.date,
         categoryId: e.categoryId == null ? null : categoryIds[e.categoryId],
+        items: [
+          for (final item in e.items)
+            Item(
+              name: item.name,
+              amount: item.amount,
+              people: [for (final id in item.people) friendIds[id]!],
+            ),
+        ],
       ),
     );
   }
@@ -220,9 +228,14 @@ void _check(Ledger ledger) {
         'is split with someone unknown',
       _ when e.parts.values.any((part) => part < 0) => 'has a negative part',
       _
-          when e.split == SplitMode.exact &&
+          when (e.split == SplitMode.exact || e.split == SplitMode.items) &&
               e.parts.values.fold(0, (sum, part) => sum + part) != e.amount =>
         'has parts that don’t add up to its amount',
+      _
+          when !e.items.every(
+            (i) => i.people.isNotEmpty && i.people.every(e.parts.containsKey),
+          ) =>
+        'has an item shared with someone not in it',
       _ when !bills.contains(e.billId) => 'is in an unknown bill',
       _ when e.categoryId != null && !categories.contains(e.categoryId) =>
         'is in an unknown category',

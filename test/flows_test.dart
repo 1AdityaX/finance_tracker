@@ -57,6 +57,78 @@ void main() {
       expect(lines.single.value, '₹150');
     });
 
+    test('splits by item: each thing shared only by the people in it', () {
+      // Snacks for ₹235, paid by you: a ₹80 omelette you and Rahul shared,
+      // Rahul's ₹35 popcorn, Priya's ₹20 tea, and ₹100 of juice for you and
+      // Priya.
+      final flow = ExpenseFlow(ledgerWith())
+        ..name.text = 'Snacks'
+        ..amount.paise = 23500
+        ..people.selected.addAll(['rahul', 'priya'])
+        ..split.mode = SplitMode.items;
+      final split = flow.split;
+      expect(split.problem, 'Add what was bought to continue.');
+      split.addItem()
+        ..name = 'Omelette'
+        ..paise = 8000
+        ..people.addAll([me, 'rahul']);
+      split.addItem()
+        ..name = 'Popcorn'
+        ..paise = 3500;
+      expect(split.problem, 'Pick who shared “Popcorn”.');
+      split.items.last.people.add('rahul');
+      expect(split.problem, '₹120 still to assign.');
+      split.addItem()
+        ..paise = 2000
+        ..people.add('priya');
+      split.addItem()
+        ..name = 'Juice'
+        ..paise = 10000
+        ..people.addAll(['priya', me]);
+      expect(split.problem, isNull);
+      expect(split.phrase, 'split by 4 items');
+
+      final saved = flow.save().expenses.single;
+      expect(saved.split, SplitMode.items);
+      expect(saved.shares, {me: 9000, 'rahul': 7500, 'priya': 7000});
+      expect(saved.items.map((i) => i.name), [
+        'Omelette',
+        'Popcorn',
+        'Item 3',
+        'Juice',
+      ]);
+      expect(saved.items.last.people, [me, 'priya'], reason: 'you first');
+
+      final lines = flow.review.expand((s) => s).toList();
+      expect(lines.map((l) => (l.label, l.value, l.detail)).take(4), [
+        ('Omelette', '₹80', 'You, Rahul'),
+        ('Popcorn', '₹35', 'Rahul'),
+        ('Item 3', '₹20', 'Priya'),
+        ('Juice', '₹100', 'You, Priya'),
+      ]);
+      expect(
+        lines.singleWhere((l) => l.label == 'Rahul').detail,
+        'Omelette, Popcorn',
+      );
+
+      // Editing it brings the items back as they were.
+      final edit = ExpenseFlow(flow.save(), existing: saved);
+      expect(edit.split.mode, SplitMode.items);
+      expect(edit.split.items.map((i) => i.paise), [8000, 3500, 2000, 10000]);
+      expect(edit.split.problem, isNull);
+    });
+
+    test('items stop counting someone who leaves the expense', () {
+      final flow = dinner(ledgerWith())
+        ..people.selected.add('priya')
+        ..split.mode = SplitMode.items;
+      flow.split.addItem()
+        ..paise = 120000
+        ..people.addAll(['rahul', 'priya']);
+      flow.people.selected.remove('priya');
+      expect(flow.save().expenses.single.shares, {me: 0, 'rahul': 120000});
+    });
+
     test('a friend who paid is dropped with the friends', () {
       final flow = dinner(ledgerWith())..payer.selected = 'rahul';
       flow.people.selected.clear();

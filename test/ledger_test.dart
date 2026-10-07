@@ -6,6 +6,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support.dart';
 
 void main() {
+  test('an expense split by item saves its items and shares', () {
+    final snacks = expense(
+      amount: 10000,
+      split: SplitMode.items,
+      parts: itemParts(const [
+        Item(name: 'Omelette', amount: 8000, people: [me, 'rahul']),
+        Item(name: 'Tea', amount: 2000, people: ['rahul']),
+      ]),
+    );
+    expect(snacks.shares, {me: 4000, 'rahul': 6000});
+    final withItems = Expense.fromJson({
+      ...snacks.toJson(),
+      'items': [
+        {
+          'name': 'Omelette',
+          'amount': 8000,
+          'people': [me, 'rahul'],
+        },
+      ],
+    });
+    expect(Expense.fromJson(withItems.toJson()).items.single.people, [
+      me,
+      'rahul',
+    ]);
+    expect(expense().toJson().containsKey('items'), isFalse);
+  });
+
   group('shares', () {
     test('equal, quantity, percent and exact all add up to the amount', () {
       expect(expense(parts: {me: 1, 'rahul': 1, 'priya': 1}).shares, {

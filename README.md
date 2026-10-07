@@ -30,6 +30,8 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 - Every save can be undone from the snackbar or with `/undo`.
 - Pickers can add a new friend, bill or category by typing a name. It is saved with the record, so cancelling adds nothing.
 
+To split one bill where people had different things, choose **By item** on the split question. Add each item with what it cost and tick who shared it; each item is split equally between its people, and the items must add up to the total. For example, ₹235 of snacks: an ₹80 omelette for you and Narendhran, ₹35 popcorn for Narendhran, ₹20 tea for Aayush and ₹100 of juice for you and Prathiyush comes to ₹90 for you, ₹75 for Narendhran, ₹20 for Aayush and ₹50 for Prathiyush. The review lists every item and who had it, and a friend's page shows which items they owe for.
+
 Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
 A friend's page lists what is still open between you, oldest first: each expense with its date, how much of their share is paid, and what is left. Money paid without picking an expense is listed on its own, so the rows add up to the balance.
@@ -136,7 +138,7 @@ To add a command, subclass `CommandFlow` and add a `Command` to the list in `hom
 ## Money rules
 
 - Money is stored as integer paise and shown with Indian digit grouping, e.g. ₹12,34,567.50.
-- Shares always sum to the total. Equal, quantity and percentage splits hand out leftover paise by largest remainder, ties broken by person id, so rounding is deterministic.
+- Shares always sum to the total. Equal, quantity and percentage splits, and each item in a split by item, hand out leftover paise by largest remainder, ties broken by person id, so rounding is deterministic.
 - Percentages are stored as basis points, so 33.33% is exact.
 - If exactly one share is left blank, it gets the remainder.
 - A positive balance means the friend owes you; negative means you owe them. Expenses only between other people don't affect your balances.
@@ -149,11 +151,12 @@ To add a command, subclass `CommandFlow` and add a `Command` to the list in `hom
 
 The ledger is one JSON document in a single SQLite row (`shared_expenses.db`, table `tracker_state`), written in one statement per change. A failed save keeps the previous state; a failed load is reported without writing anything.
 
-The document has a `version`, currently 5:
+The document has a `version`, currently 6:
 
 - 3 added categories.
 - 4 lets a payment go toward several expenses (`settles`: expense id to paise, in order).
 - 5 adds money in (`incomes`) and categories excluded from spending (`counted: false`).
+- 6 adds splitting by item (`split: items`, with `items`: name, amount and people for each).
 
 Older data loads as is; a payment that named one expense puts its whole amount toward it. Version 1 data is upgraded on load with balances unchanged (see `decodeLedger` in `lib/data/store.dart`). Format changes must add an upgrade path, never reset data.
 
