@@ -85,8 +85,8 @@ abstract class _NameFlow extends CommandFlow {
 class BillFlow extends _NameFlow {
   BillFlow(super.ledger, {this.existing}) {
     name = TextAsk(
-      'What should the bill be called?',
-      hint: 'A bill groups expenses, like a trip or a night out.',
+      'What should the group be called?',
+      hint: 'A group keeps expenses together, like a trip or a night out.',
       placeholder: 'Goa trip',
       text: existing?.name ?? '',
       taken: (text) =>
@@ -95,7 +95,7 @@ class BillFlow extends _NameFlow {
             text,
             except: existing?.id,
           )
-          ? 'You already have a bill called “$text”.'
+          ? 'You already have a group called “$text”.'
           : null,
     );
   }
@@ -105,10 +105,10 @@ class BillFlow extends _NameFlow {
   late final String id = existing?.id ?? newId();
 
   @override
-  String get title => existing == null ? 'New bill' : 'Rename bill';
+  String get title => existing == null ? 'New group' : 'Rename group';
 
   @override
-  String get saveLabel => existing == null ? 'Create bill' : 'Save name';
+  String get saveLabel => existing == null ? 'Create group' : 'Save name';
 
   @override
   String get savedMessage => existing == null
@@ -247,8 +247,8 @@ mixin _Creates on CommandFlow {
   );
 
   late final billCreator = Creator(
-    placeholder: 'Search or start a new bill',
-    label: (name) => 'New bill “$name”',
+    placeholder: 'Search or start a new group',
+    label: (name) => 'New group “$name”',
     create: (name) {
       final bill = Bill(id: newId(), name: name, created: DateTime.now());
       _newBills.add(bill);
@@ -311,7 +311,7 @@ class ExpenseFlow extends CommandFlow with _Creates {
       creator: categoryCreator,
     );
     bill = PickAsk(
-      'Which bill is it part of?',
+      'Which group is it part of?',
       hint: 'Most expenses go in General.',
       choices: () => [for (final b in bills) Choice(b.id, b.name)],
       describe: (c) => 'in ${c.label}',
@@ -565,8 +565,8 @@ class PaymentFlow extends CommandFlow with _Creates {
       creator: friendCreator,
     );
     bill = PickAsk(
-      'Which bill is it for?',
-      hint: 'Use General if it isn’t for a particular bill.',
+      'Which group is it for?',
+      hint: 'Use General if it isn’t for a particular group.',
       choices: () {
         final id = friend.selected;
         return [

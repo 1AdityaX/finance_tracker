@@ -64,7 +64,7 @@ class BillScreen extends StatelessWidget {
                   ),
                   PopupMenuItem(
                     value: () => _delete(context, bill, expenses.length),
-                    child: const Text('Delete bill'),
+                    child: const Text('Delete group'),
                   ),
                 ],
               ),
@@ -119,7 +119,7 @@ class BillScreen extends StatelessWidget {
                 const SectionHeader('Activity'),
                 if (expenses.isEmpty && payments.isEmpty)
                   const EmptyNote(
-                    'Expenses you add to this bill show up here.',
+                    'Expenses you add to this group show up here.',
                   ),
               ],
             ),

@@ -146,7 +146,7 @@ class FriendScreen extends StatelessWidget {
                 ],
                 if (bills.length > 1 ||
                     bills.any((b) => b.bill.id != generalBill)) ...[
-                  const SectionHeader('By bill'),
+                  const SectionHeader('By group'),
                   for (final b in bills)
                     ListTile(
                       title: Text(b.bill.name),

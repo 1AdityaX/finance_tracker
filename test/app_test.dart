@@ -91,10 +91,10 @@ void main() {
 
     // The bill is asked even with only General, which Continue accepts;
     // typing a name offers to start a new bill.
-    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    expect(find.text('Which group is it part of?'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Goa');
     await tester.pumpAndSettle();
-    expect(find.text('New bill “Goa”'), findsOneWidget);
+    expect(find.text('New group “Goa”'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '');
     await tester.pumpAndSettle();
     await tester.next();
@@ -210,7 +210,7 @@ void main() {
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    expect(find.text('Which group is it part of?'), findsOneWidget);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('Which category is it?'), findsOneWidget);
@@ -403,9 +403,9 @@ void main() {
 
   testWidgets('a bill made first shows on home', (tester) async {
     await pumpApp(tester);
-    await tester.tapText('/bill');
+    await tester.tapText('/group');
     await tester.type('Goa trip');
-    await tester.tapText('Create bill');
+    await tester.tapText('Create group');
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Goa trip'), findsOneWidget);
@@ -480,9 +480,9 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, ledgerWith());
-    await tester.tapText('/bill');
+    await tester.tapText('/group');
     await tester.type('Flat');
-    await tester.tapText('Create bill');
+    await tester.tapText('Create group');
     expect(find.text('No expenses yet.'), findsOneWidget);
     await tester.tapText('Add expense');
     await tester.type('Rent');
@@ -517,11 +517,11 @@ void main() {
     tester,
   ) async {
     final store = await pumpApp(tester, ledgerWith(expenses: [expense()]));
-    await tester.tapText('/bill');
+    await tester.tapText('/group');
     // Something changes the ledger while the flow is open.
     await store.save(store.ledger.removeExpense('e1'), 'Deleted');
     await tester.type('Flat');
-    await tester.tapText('Create bill');
+    await tester.tapText('Create group');
     expect(store.ledger.expenses, isEmpty);
     expect(store.ledger.bills.map((b) => b.name), contains('Flat'));
   });
@@ -560,9 +560,9 @@ void main() {
 
   testWidgets('/undo reverts the last change', (tester) async {
     final store = await pumpApp(tester, ledgerWith());
-    await tester.tapText('/bill');
+    await tester.tapText('/group');
     await tester.type('Flat');
-    await tester.tapText('Create bill');
+    await tester.tapText('Create group');
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.byType(TextField));
@@ -605,23 +605,23 @@ void main() {
     await tester.tap(find.byType(TextField));
     await tester.pumpAndSettle();
     expect(find.text('/friend'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'bi');
+    await tester.enterText(find.byType(TextField), 'gr');
     await tester.pumpAndSettle();
-    expect(find.text('/bill'), findsOneWidget);
+    expect(find.text('/group'), findsOneWidget);
     expect(find.text('/expense'), findsNothing);
     await tester.testTextInput.receiveAction(TextInputAction.go);
     await tester.pumpAndSettle();
-    expect(find.text('What should the bill be called?'), findsOneWidget);
+    expect(find.text('What should the group be called?'), findsOneWidget);
     await tester.type('goa TRIP');
-    await tester.tapText('Create bill');
-    expect(find.text('You already have a bill called “goa TRIP”.'), findsOne);
+    await tester.tapText('Create group');
+    expect(find.text('You already have a group called “goa TRIP”.'), findsOne);
   });
 
   testWidgets('undo removes a new bill and closes its screen', (tester) async {
     final store = await pumpApp(tester, ledgerWith());
-    await tester.tapText('/bill');
+    await tester.tapText('/group');
     await tester.type('Flat');
-    await tester.tapText('Create bill');
+    await tester.tapText('Create group');
     expect(store.ledger.bills.map((b) => b.name), contains('Flat'));
     await tester.tapText('Undo');
     expect(store.ledger.bills.map((b) => b.name), isNot(contains('Flat')));
@@ -652,7 +652,7 @@ void main() {
     await tester.tapText('Received');
     await tester.type('100');
     await tester.next();
-    expect(find.text('Which bill is it for?'), findsOneWidget);
+    expect(find.text('Which group is it for?'), findsOneWidget);
     expect(find.widgetWithText(ActionChip, 'from Rahul'), findsOneWidget);
     await tester.tapText('General');
     await tester.next(); // Not for any expense in particular.
@@ -723,7 +723,7 @@ void main() {
     await tester.tapText('Goa trip');
     await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
     await tester.pumpAndSettle();
-    await tester.tapText('Delete bill');
+    await tester.tapText('Delete group');
     expect(store.ledger.bill('goa'), isNull);
     expect(store.ledger.expenses, isEmpty);
     expect(find.text('“Goa trip” and its expense deleted'), findsOneWidget);
@@ -1295,7 +1295,7 @@ void main() {
     await tester.tapText('Add expense');
     await tester.type('Train');
     await tester.next();
-    expect(find.text('Which bill is it part of?'), findsOneWidget);
+    expect(find.text('Which group is it part of?'), findsOneWidget);
     expect(find.widgetWithText(ActionChip, 'Travel'), findsOneWidget);
     await tester.next();
     await tester.type('300');

@@ -6,15 +6,19 @@ Platforms: Android and iOS.
 
 ## How it works
 
+- An **expense** is one payment, like ₹235 of snacks: who paid, who shared it and how it was split.
+- A **category** is the kind of spending, like Food or Fuel. It only sorts your own spending and never changes what anyone owes.
+- A **group** keeps the expenses of one occasion together, like a trip, with its own totals and balances. Most expenses go in General. In the code and saved data a group is a `Bill`.
+
 Every action is a slash command. Tap a shortcut above the command bar, or type `/` and pick one. The app asks one question per page.
 
 | Command | Questions, in order |
 | --- | --- |
-| `/expense` | What was it for? · Which category? · Which bill? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
-| `/sent` | How much? · To whom? · Which bill? · Which expenses? |
-| `/receive` | How much? · From whom? · Which bill? · Which expenses? |
+| `/expense` | What was it for? · Which category? · Which group? · How much? · How many units? · Who shared it? · Who paid? · How to split it |
+| `/sent` | How much? · To whom? · Which group? · Which expenses? |
+| `/receive` | How much? · From whom? · Which group? · Which expenses? |
 | `/income` | How much? · Who gave it? · What's it for? (optional) |
-| `/bill` | What's it called? |
+| `/group` | What's it called? |
 | `/friend` | What's their name? |
 | `/category` | What's it called? · Count it in your spending? |
 | `/categories` | Opens the list of categories |
@@ -22,15 +26,15 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 | `/import` | Choose a file, check what it adds, then add it |
 | `/undo` | Reverts the last change |
 
-- Defaults: no category, bill General, quantity 1, payer you, equal split (by quantity when there is more than one unit), and no expenses for a payment (it goes to the overall balance).
-- Questions that don't apply are skipped. Who paid and how to split are asked only once a friend is picked. Splitting by quantity appears only with more than one unit. A flow started from a bill's or friend's page fills that answer in and skips it.
+- Defaults: no category, group General, quantity 1, payer you, equal split (by quantity when there is more than one unit), and no expenses for a payment (it goes to the overall balance).
+- Questions that don't apply are skipped. Who paid and how to split are asked only once a friend is picked. Splitting by quantity appears only with more than one unit. A flow started from a group's or friend's page fills that answer in and skips it.
 - Answers so far show as chips at the top, e.g. `Pizza · in Goa trip · ₹1,200 · 4 units`. Tapping one goes back to that question, then on to the next question that needs an answer, or to the review.
 - Back, including the system gesture, goes to the previous page and keeps answers. Closing a flow asks for confirmation only if answers would be lost.
 - The review card shows each share, who will owe whom, and your spending for the month. The date defaults to today; tap it to change it.
 - Every save can be undone from the snackbar or with `/undo`.
-- Pickers can add a new friend, bill or category by typing a name. It is saved with the record, so cancelling adds nothing.
+- Pickers can add a new friend, group or category by typing a name. It is saved with the record, so cancelling adds nothing.
 
-To split one bill where people had different things, choose **By item** on the split question. Add each item with what it cost and tick who shared it; each item is split equally between its people, and the items must add up to the total. For example, ₹235 of snacks: an ₹80 omelette for you and Narendhran, ₹35 popcorn for Narendhran, ₹20 tea for Aayush and ₹100 of juice for you and Prathiyush comes to ₹90 for you, ₹75 for Narendhran, ₹20 for Aayush and ₹50 for Prathiyush. The review lists every item and who had it, and a friend's page shows which items they owe for.
+To split one expense where people had different things, choose **By item** on the split question. Add each item with what it cost and tick who shared it; each item is split equally between its people, and the items must add up to the total. For example, ₹235 of snacks: an ₹80 omelette for you and Narendhran, ₹35 popcorn for Narendhran, ₹20 tea for Aayush and ₹100 of juice for you and Prathiyush comes to ₹90 for you, ₹75 for Narendhran, ₹20 for Aayush and ₹50 for Prathiyush. The review lists every item and who had it, and a friend's page shows which items they owe for.
 
 Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
@@ -41,8 +45,8 @@ A friend's page lists what is still open between you, oldest first: each expense
 `/spending`, or the "Spent in" row on home, shows one month:
 
 - Total spent, compared with the previous month (the current month is compared with the same days of last month).
-- Spending by category and by bill as bars. Uncategorised expenses come last, under "No category".
-- Every expense you have a share in, largest first. Tap a category or bill to filter; tap an expense to edit it.
+- Spending by category and by group as bars. Uncategorised expenses come last, under "No category".
+- Every expense you have a share in, largest first. Tap a category or group to filter; tap an expense to edit it.
 
 Spending is your share of each expense. Money you paid for friends is what they owe you, not spending, and payments between people never count.
 
@@ -54,12 +58,12 @@ A category can be excluded from spending by answering "No, leave it out" to "Cou
 
 ## Importing
 
-`/import` adds records from a file, such as a bank statement sorted into expenses. Choose the file and the app shows what it would add: how many expenses, payments and money in, their dates, and any new friends, categories and bills. Nothing is saved until you tap "Add to my records", and Undo takes it back.
+`/import` adds records from a file, such as a bank statement sorted into expenses. Choose the file and the app shows what it would add: how many expenses, payments and money in, their dates, and any new friends, categories and groups. Nothing is saved until you tap "Add to my records", and Undo takes it back.
 
 The file is a ledger in the same JSON format the app saves (see [Data](#data)), at any supported version. Importing:
 
 - only adds; nothing you have is changed or removed.
-- matches friends, categories and bills to yours by name, ignoring case, so it never makes a second friend with the same name.
+- matches friends, categories and groups to yours by name, ignoring case, so it never makes a second friend with the same name.
 - skips expenses, payments and money in whose id you already have, so importing a file twice adds nothing.
 - refuses a file whose records don't add up, such as exact parts that don't total the amount or a payment toward an expense not in the file, and says which record. Nothing is saved.
 
@@ -93,8 +97,8 @@ lib/
   theme.dart             Material 3 theme (light and dark), balance and chart colours
   data/
     money.dart           Paise formatting, parsing, and exact apportioning
-    ledger.dart          Friend, Bill, Category, Expense, Payment, balance queries
-    spending.dart        Your spending in a month, by category and by bill
+    ledger.dart          Friend, Bill (a group), Category, Expense, Payment, balance queries
+    spending.dart        Your spending in a month, by category and by group
     store.dart           Persistence (SQLite), undo, and upgrading old data
     cloud.dart           Syncing with a cloud copy: diffs, three-way merge, SyncedStorage
     import.dart          Adding records from a file, matched to yours by name
@@ -103,13 +107,13 @@ lib/
     account.dart         Google sign-in, and keeping the ledger in step with Firestore
   flows/
     ask.dart             Question types: text, amount, count, pick, multi-pick, split
-    flows.dart           The command flows: expense, payment, bill, friend, category
+    flows.dart           The command flows: expense, payment, group, friend, category
   screens/
     flow_screen.dart     Runs a flow: step bar, answer chips, review, saving
     ask_views.dart       The input for each question type
-    home_screen.dart     Balances, bills, recent activity, and the command bar
+    home_screen.dart     Balances, groups, recent activity, and the command bar
     friend_screen.dart   One friend's balance, what is still open, and history
-    bill_screen.dart     One bill's expenses and balances
+    bill_screen.dart     One group's expenses and balances
     spending_screen.dart A month of spending: total, comparison, bars, expenses
     categories_screen.dart  The list of categories
     category_screen.dart One category: its expenses, editing and deleting it
@@ -144,8 +148,8 @@ To add a command, subclass `CommandFlow` and add a `Command` to the list in `hom
 - A positive balance means the friend owes you; negative means you owe them. Expenses only between other people don't affect your balances.
 - Money received lowers what a friend owes you; money sent lowers what you owe them. `/income` affects no balance.
 - A payment can go toward several expenses. Ticked expenses are paid in the order ticked, each up to what is still open on it. For example, ₹31 toward ₹15 of lollipops then ₹17.50 of nachos pays the lollipops in full and ₹16 of the nachos, leaving ₹1.50 open. Any remainder goes to the overall balance. If the money runs out before a ticked expense, the page blocks until it is unticked or reordered. Nothing is counted twice.
-- The part of a payment that goes to an expense counts in that expense's bill; the rest counts in the payment's bill, and a bill's page lists every payment with money in it. Opening a payment doesn't change its allocation unless you change the amount or the ticks.
-- Deleting an expense keeps its payments; what they put toward it moves to the overall balance. Deleting a bill deletes its expenses and moves its payments to General.
+- The part of a payment that goes to an expense counts in that expense's group; the rest counts in the payment's group, and a group's page lists every payment with money in it. Opening a payment doesn't change its allocation unless you change the amount or the ticks.
+- Deleting an expense keeps its payments; what they put toward it moves to the overall balance. Deleting a group deletes its expenses and moves its payments to General.
 
 ## Data
 

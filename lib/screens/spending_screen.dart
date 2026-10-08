@@ -152,7 +152,7 @@ class _SpendingScreenState extends State<SpendingScreen> {
                       onTap: () => _toggle((bill: false, id: row.id)),
                     ),
                   if (bills.isNotEmpty) ...[
-                    const SectionHeader('By bill'),
+                    const SectionHeader('By group'),
                     for (final row in bills)
                       _BarRow(
                         key: ValueKey('bill/${row.id}'),

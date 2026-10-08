@@ -598,7 +598,7 @@ class _SettleViewState extends State<_SettleView> with _Filtering {
       onSubmitted: _submit,
       status: expenses.isEmpty ? null : _status(theme),
       empty:
-          'Nothing is open with them in this bill. Continue to put it '
+          'Nothing is open with them in this group. Continue to put it '
           'toward the overall balance.',
       tile: (c) {
         final part = settles[c.id];

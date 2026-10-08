@@ -236,7 +236,7 @@ void _check(Ledger ledger) {
             (i) => i.people.isNotEmpty && i.people.every(e.parts.containsKey),
           ) =>
         'has an item shared with someone not in it',
-      _ when !bills.contains(e.billId) => 'is in an unknown bill',
+      _ when !bills.contains(e.billId) => 'is in an unknown group',
       _ when e.categoryId != null && !categories.contains(e.categoryId) =>
         'is in an unknown category',
       _ => null,
@@ -249,7 +249,7 @@ void _check(Ledger ledger) {
       _ when p.amount <= 0 => 'has no amount',
       _ when !friends.contains(p.friendId) || p.friendId == me =>
         'is with someone unknown',
-      _ when !bills.contains(p.billId) => 'is in an unknown bill',
+      _ when !bills.contains(p.billId) => 'is in an unknown group',
       _ when !p.settles.keys.every(expenses.contains) =>
         'pays toward an expense that isn’t in the file',
       _ when p.settles.values.any((part) => part <= 0) || p.unassigned < 0 =>

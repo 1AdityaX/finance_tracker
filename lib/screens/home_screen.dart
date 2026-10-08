@@ -50,8 +50,8 @@ final commands = [
     (ledger) => PaymentFlow(ledger, Direction.received),
   ),
   Command(
-    'bill',
-    'Group expenses into a bill, like a trip',
+    'group',
+    'Keep expenses together, like a trip',
     Icons.folder_open_outlined,
     BillFlow.new,
   ),
@@ -372,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () =>
                     _open(FriendScreen(store: store, friendId: friend.id)),
               ),
-            const SectionHeader('Bills'),
+            const SectionHeader('Groups'),
             for (final bill in ledger.billsInOrder) _billTile(ledger, bill),
             const SectionHeader('Categories'),
             if (ledger.categories.isEmpty)

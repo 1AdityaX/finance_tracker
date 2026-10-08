@@ -136,7 +136,7 @@ class _ImportScreenState extends State<ImportScreen> {
       if (preview.newCategories.isNotEmpty)
         _names(Icons.sell_outlined, 'New categories', preview.newCategories),
       if (preview.newBills.isNotEmpty)
-        _names(Icons.folder_open_outlined, 'New bills', preview.newBills),
+        _names(Icons.folder_open_outlined, 'New groups', preview.newBills),
       if (preview.skipped > 0)
         ListTile(
           leading: const IconBadge(Icons.done_all),

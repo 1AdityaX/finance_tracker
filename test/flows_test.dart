@@ -672,7 +672,7 @@ void main() {
   group('BillFlow and FriendFlow', () {
     test('reject names already in use, ignoring case', () {
       final bill = BillFlow(ledgerWith())..name.text = 'goa TRIP';
-      expect(bill.name.problem, 'You already have a bill called “goa TRIP”.');
+      expect(bill.name.problem, 'You already have a group called “goa TRIP”.');
       final friend = FriendFlow(ledgerWith())..name.text = ' rahul ';
       expect(friend.name.problem, isNotNull);
       expect(FriendFlow(ledgerWith(), existing: rahul).name.problem, isNull);
