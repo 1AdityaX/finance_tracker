@@ -13,6 +13,7 @@ import 'bill_screen.dart';
 import 'categories_screen.dart';
 import 'category_screen.dart';
 import 'friend_screen.dart';
+import 'friends_screen.dart';
 import 'import_screen.dart';
 import 'spending_screen.dart';
 import 'widgets.dart';
@@ -66,6 +67,12 @@ final commands = [
     'Add someone you split costs with',
     Icons.person_add_alt_1_outlined,
     FriendFlow.new,
+  ),
+  Command.screen(
+    'friends',
+    'See all your friends, settled or not',
+    Icons.group_outlined,
+    (store) => FriendsScreen(store: store),
   ),
   Command.screen(
     'spending',
@@ -363,14 +370,30 @@ class _HomeScreenState extends State<HomeScreen> {
             const SectionHeader('Spending'),
             _spendingTile(ledger),
             const SectionHeader('Friends'),
-            if (friends.isEmpty) const EmptyNote('Add friends with /friend.'),
+            if (friends.isEmpty)
+              const EmptyNote('Add friends with /friend.')
+            else if (friends.every((f) => balances[f.id] == 0))
+              const EmptyNote('You’re settled up with everyone.'),
+            // Settled friends are on the friends page, not here.
             for (final friend in friends)
+              if (balances[friend.id] != 0)
+                ListTile(
+                  leading: Avatar(friend.name),
+                  title: Text(friend.name),
+                  subtitle: BalanceText(balances[friend.id]!),
+                  onTap: () =>
+                      _open(FriendScreen(store: store, friendId: friend.id)),
+                ),
+            if (ledger.friends.isNotEmpty)
               ListTile(
-                leading: Avatar(friend.name),
-                title: Text(friend.name),
-                subtitle: BalanceText(balances[friend.id]!),
-                onTap: () =>
-                    _open(FriendScreen(store: store, friendId: friend.id)),
+                leading: const IconBadge(Icons.group_outlined),
+                title: const Text('All friends'),
+                subtitle: Text(switch (ledger.friends.length) {
+                  1 => '1 friend',
+                  final n => '$n friends',
+                }),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _open(FriendsScreen(store: store)),
               ),
             const SectionHeader('Groups'),
             for (final bill in ledger.billsInOrder) _billTile(ledger, bill),

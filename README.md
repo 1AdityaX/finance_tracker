@@ -20,6 +20,7 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 | `/income` | How much? · Who gave it? · What's it for? (optional) |
 | `/group` | What's it called? |
 | `/friend` | What's their name? |
+| `/friends` | Opens every friend, settled or not |
 | `/category` | What's it called? · Count it in your spending? |
 | `/categories` | Opens the list of categories |
 | `/spending` | Opens monthly spending |
@@ -35,6 +36,8 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 - Pickers can add a new friend, group or category by typing a name. It is saved with the record, so cancelling adds nothing.
 
 To split one expense where people had different things, choose **By item** on the split question. Add each item with what it cost and tick who shared it; each item is split equally between its people, and the items must add up to the total. For example, ₹235 of snacks: an ₹80 omelette for you and Narendhran, ₹35 popcorn for Narendhran, ₹20 tea for Aayush and ₹100 of juice for you and Prathiyush comes to ₹90 for you, ₹75 for Narendhran, ₹20 for Aayush and ₹50 for Prathiyush. The review lists every item and who had it, and a friend's page shows which items they owe for.
+
+Home lists only friends you're not settled with. **All friends** at the end of that list, or `/friends`, opens every friend: those not settled first, then those settled up.
 
 Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
@@ -113,6 +116,7 @@ lib/
     ask_views.dart       The input for each question type
     home_screen.dart     Balances, groups, recent activity, and the command bar
     friend_screen.dart   One friend's balance, what is still open, and history
+    friends_screen.dart  Every friend, those not settled first
     bill_screen.dart     One group's expenses and balances
     spending_screen.dart A month of spending: total, comparison, bars, expenses
     categories_screen.dart  The list of categories

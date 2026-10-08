@@ -555,7 +555,29 @@ void main() {
     await tester.type('Asha');
     await tester.tapText('Add friend');
     expect(store.ledger.friends.single.name, 'Asha');
+    // Settled friends wait on the friends page rather than home.
+    expect(find.text('Asha'), findsNothing);
+    expect(find.text('You’re settled up with everyone.'), findsOneWidget);
+    await tester.tapText('All friends');
+    expect(find.text('Settled up'), findsOneWidget);
     expect(find.text('Asha'), findsOneWidget);
+  });
+
+  testWidgets('home lists only friends with money open; /friends lists all', (
+    tester,
+  ) async {
+    await pumpApp(tester, ledgerWith(expenses: [expense()]));
+    expect(find.text('Rahul'), findsOneWidget);
+    expect(find.text('Priya'), findsNothing);
+    expect(find.text('2 friends'), findsOneWidget);
+    await tester.tapText('Type a command');
+    await tester.enterText(find.byType(TextField), 'friends');
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(find.text('Not settled'), findsOneWidget);
+    expect(find.text('Settled up'), findsOneWidget);
+    expect(find.text('Priya'), findsOneWidget);
+    expect(find.text('Rahul'), findsOneWidget);
   });
 
   testWidgets('/undo reverts the last change', (tester) async {
@@ -703,6 +725,8 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
+    expect(find.text('Priya'), findsNothing, reason: 'settled, so not on home');
+    await tester.tapText('All friends');
     await tester.tapText('Priya');
     await tester.tap(find.byType(PopupMenuButton<VoidCallback>));
     await tester.pumpAndSettle();
