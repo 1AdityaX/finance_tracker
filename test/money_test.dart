@@ -68,4 +68,52 @@ void main() {
       expect(apportion(120000, {'me': 3, 'r': 1}), {'me': 90000, 'r': 30000});
     });
   });
+
+  group('evaluateHundredths', () {
+    test('works out sums like a spreadsheet', () {
+      expect(evaluateHundredths('1000-300'), 70000);
+      expect(evaluateHundredths('1,000 - 300'), 70000);
+      expect(evaluateHundredths('80+35+20+100'), 23500);
+      expect(evaluateHundredths('3*45.50'), 13650);
+      expect(evaluateHundredths('3×45.5'), 13650);
+      expect(evaluateHundredths('2+3*4'), 1400, reason: '× before +');
+      expect(evaluateHundredths('(2+3)*4'), 2000);
+      expect(evaluateHundredths('1200/4'), 30000);
+      expect(evaluateHundredths('100÷3'), 3333);
+      expect(evaluateHundredths('200÷3'), 6667, reason: 'rounds halves up');
+      expect(evaluateHundredths('1000+(-300)'), 70000);
+      expect(evaluateHundredths('.5'), 50);
+    });
+
+    test('a plain number reads as itself', () {
+      expect(evaluateHundredths('1200'), 120000);
+      expect(evaluateHundredths('1200.5'), 120050);
+      expect(evaluateHundredths(' 15 '), 1500);
+    });
+
+    test('refuses what isn’t a whole sum', () {
+      for (final bad in [
+        '',
+        '1000-',
+        '*5',
+        '(1+2',
+        '1+2)',
+        '5/0',
+        '5/(2-2)',
+        '300-1000',
+        '1.234',
+        '12a',
+        '999999999999',
+      ]) {
+        expect(evaluateHundredths(bad), isNull, reason: bad);
+      }
+    });
+
+    test('tells a sum from a plain number', () {
+      expect(isSum('1000-300'), isTrue);
+      expect(isSum('(5)'), isTrue);
+      expect(isSum('1200.50'), isFalse);
+      expect(isSum('1,200'), isFalse);
+    });
+  });
 }

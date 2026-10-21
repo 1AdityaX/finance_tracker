@@ -622,6 +622,55 @@ void main() {
     expect(find.text('12000'), findsOneWidget);
   });
 
+  testWidgets('an amount can be a sum, like in a spreadsheet', (tester) async {
+    final store = await pumpApp(tester, ledgerWith());
+    await tester.tapText('/expense');
+    await tester.type('Rent');
+    await tester.next();
+    await tester.next(); // No category.
+    await tester.next();
+    await tester.type('1000');
+    // The keypad has no minus, so the keys under the field type it.
+    await tester.tap(find.bySemanticsLabel('Minus'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      '${tester.widget<TextField>(find.byType(TextField)).controller!.text}300',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1000-300'), findsOneWidget);
+    expect(find.text('= ₹700'), findsOneWidget);
+    await tester.next();
+    // Moving on shows the result in the answers so far.
+    expect(find.widgetWithText(ActionChip, '₹700'), findsOneWidget);
+    await tester.next(); // 1 unit.
+    await tester.next(); // Just you.
+    await tester.tapText('Add expense');
+    expect(store.ledger.expenses.single.amount, 70000);
+  });
+
+  testWidgets('split amounts take sums too', (tester) async {
+    final store = await pumpApp(tester, ledgerWith());
+    await tester.tapText('/expense');
+    await tester.type('Dinner');
+    await tester.next();
+    await tester.next();
+    await tester.next();
+    await tester.type('1200');
+    await tester.next();
+    await tester.next();
+    await tester.tapText('Rahul');
+    await tester.next();
+    await tester.tapText('You');
+    await tester.tapText('By amount');
+    await tester.enterText(find.byType(TextField).last, '2*450');
+    await tester.pumpAndSettle();
+    expect(find.text('All ₹1,200 assigned'), findsOneWidget);
+    await tester.next();
+    await tester.tapText('Add expense');
+    expect(store.ledger.expenses.single.shares, {me: 30000, 'rahul': 90000});
+  });
+
   testWidgets('typing a slash command filters and runs it', (tester) async {
     await pumpApp(tester, ledgerWith());
     await tester.tap(find.byType(TextField));

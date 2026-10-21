@@ -26,6 +26,106 @@ int? parseHundredths(String input) {
       int.parse((match[2] ?? '').padRight(2, '0'));
 }
 
+/// Works out sums typed into a money field, as a spreadsheet does:
+/// `"1000-300"` gives `70000`, `"3*45.50"` gives `13650`. Handles `+`, `-`,
+/// `*` or `×`, `/` or `÷` and brackets, with `*` and `/` before `+` and `-`.
+/// Commas and spaces are ignored. The arithmetic is exact and only the result
+/// is rounded, to the nearest hundredth, halves up.
+///
+/// Returns null for anything that isn't a sum, divides by zero, or comes to
+/// less than zero or more than 999,999,999.99. A plain number is a sum too.
+int? evaluateHundredths(String input) {
+  final text = input.replaceAll(RegExp(r'[,\s]'), '');
+  if (text.isEmpty) return null;
+  final tokens = RegExp(r'\d*\.?\d+|\d+\.|[-+*/×÷()]').allMatches(text);
+  if (tokens.fold<int>(0, (n, m) => n + m.group(0)!.length) != text.length) {
+    return null;
+  }
+  final parser = _Sum([for (final m in tokens) m.group(0)!]);
+  final value = parser.sum();
+  if (value == null || !parser.done) return null;
+  final (n, d) = value;
+  if (n < BigInt.zero) return null;
+  // Hundredths are already the unit, so only the leftover fraction rounds.
+  final rounded = (n * BigInt.two + d) ~/ (d * BigInt.two);
+  return rounded > BigInt.from(99999999999) ? null : rounded.toInt();
+}
+
+/// A fraction of hundredths, kept exact while a sum is worked out.
+typedef _Fraction = (BigInt, BigInt);
+
+class _Sum {
+  _Sum(this.tokens);
+  final List<String> tokens;
+  var _at = 0;
+
+  bool get done => _at == tokens.length;
+  String? get _next => done ? null : tokens[_at];
+
+  _Fraction? sum() {
+    var total = term();
+    while (total != null && (_next == '+' || _next == '-')) {
+      final plus = tokens[_at++] == '+';
+      final right = term();
+      if (right == null) return null;
+      final (a, b) = total;
+      final (c, d) = right;
+      total = (plus ? a * d + c * b : a * d - c * b, b * d);
+    }
+    return total;
+  }
+
+  _Fraction? term() {
+    var total = factor();
+    while (total != null && const {'*', '×', '/', '÷'}.contains(_next)) {
+      final times = const {'*', '×'}.contains(tokens[_at++]);
+      final right = factor();
+      if (right == null) return null;
+      final (a, b) = total;
+      final (c, d) = right;
+      if (!times && c == BigInt.zero) return null;
+      // Both sides are in hundredths, so a product has 100 too many and a
+      // quotient 100 too few.
+      total = times
+          ? (a * c, b * d * BigInt.from(100))
+          : (a * d * BigInt.from(100), b * c);
+      final (n, m) = total;
+      if (m < BigInt.zero) total = (-n, -m);
+    }
+    return total;
+  }
+
+  _Fraction? factor() {
+    switch (_next) {
+      case '+' || '-':
+        final minus = tokens[_at++] == '-';
+        final value = factor();
+        if (value == null) return null;
+        return minus ? (-value.$1, value.$2) : value;
+      case '(':
+        _at++;
+        final value = sum();
+        if (value == null || _next != ')') return null;
+        _at++;
+        return value;
+      case final String number when RegExp(r'[\d.]').hasMatch(number):
+        _at++;
+        final [whole, fraction] = '$number.'.split('.').take(2).toList();
+        if (fraction.length > 2) return null;
+        return (
+          BigInt.parse(whole.isEmpty ? '0' : whole) * BigInt.from(100) +
+              BigInt.parse(fraction.padRight(2, '0')),
+          BigInt.one,
+        );
+      default:
+        return null;
+    }
+  }
+}
+
+/// Whether [input] is a sum to work out rather than a plain number.
+bool isSum(String input) => RegExp(r'\d\s*[-+*/×÷(]|[()]').hasMatch(input);
+
 /// Formats hundredths back into editable text: `120050` gives `"1200.5"`.
 String hundredthsText(int value) {
   final fraction = value % 100;

@@ -39,6 +39,8 @@ To split one expense where people had different things, choose **By item** on th
 
 Home lists only friends you're not settled with. **All friends** at the end of that list, or `/friends`, opens every friend: those not settled first, then those settled up.
 
+Money fields take sums, like a spreadsheet cell: type `1000-300` and it's read as ₹700, shown as "= ₹700" while you type and replaced by 700 when you move on. `+`, `−`, `×`, `÷` and brackets work, with × and ÷ before + and −. A row of those keys sits above the keyboard while a money field is focused, since number keypads lack them. The arithmetic is exact; only the result is rounded to the paisa.
+
 Tap an expense or payment to open its review card, where you can edit an answer or delete the record.
 
 A friend's page lists what is still open between you, oldest first: each expense with its date, how much of their share is paid, and what is left. Money paid without picking an expense is listed on its own, so the rows add up to the balance.
@@ -99,7 +101,7 @@ lib/
   main.dart              App entry: storage, cloud backup when set up, load-error screen
   theme.dart             Material 3 theme (light and dark), balance and chart colours
   data/
-    money.dart           Paise formatting, parsing, and exact apportioning
+    money.dart           Paise formatting, parsing sums, and exact apportioning
     ledger.dart          Friend, Bill (a group), Category, Expense, Payment, balance queries
     spending.dart        Your spending in a month, by category and by group
     store.dart           Persistence (SQLite), undo, and upgrading old data
@@ -124,6 +126,7 @@ lib/
     import_screen.dart   Choosing a file to import and previewing it
     backup.dart          The "Back up to Google" row and signing in
     widgets.dart         Shared rows, labels, and the undo snackbar
+    money_field.dart     Money fields that take sums, and the + − × ÷ keys
 test/                    Unit tests for data, sync and flows, widget tests for every flow
 ```
 

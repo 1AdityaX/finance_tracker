@@ -5,6 +5,7 @@ import '../data/ledger.dart';
 import '../data/money.dart';
 import '../flows/flows.dart';
 import '../theme.dart';
+import 'money_field.dart';
 import 'widgets.dart';
 
 /// The heading and hint shared by every question page.
@@ -60,27 +61,14 @@ class AskView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (ask) {
     final TextAsk a => _TextView(a, onChanged, onDone),
-    final AmountAsk a => _AmountView(a, onChanged, onDone),
+    final AmountAsk a => SumScope(child: _AmountView(a, onChanged, onDone)),
     final CountAsk a => _CountView(a, onChanged, onDone),
     final PickAsk a => _PickView(a, onChanged, onDone),
     final MultiPickAsk a => _MultiPickView(a, onChanged, onDone),
-    final SplitAsk a => _SplitView(a, onChanged),
+    final SplitAsk a => SumScope(child: _SplitView(a, onChanged)),
     final SettleAsk a => _SettleView(a, onChanged, onDone),
   };
 }
-
-/// Accepts digits with up to two decimals. Commas are digit grouping, as in
-/// "1,200", so they are dropped rather than read as a decimal point.
-final _decimal = TextInputFormatter.withFunction((old, value) {
-  final text = value.text.replaceAll(',', '');
-  if (!RegExp(r'^\d{0,9}(\.\d{0,2})?$').hasMatch(text)) return old;
-  final caret = value.selection.end.clamp(0, value.text.length);
-  final dropped = ','.allMatches(value.text.substring(0, caret)).length;
-  return TextEditingValue(
-    text: text,
-    selection: TextSelection.collapsed(offset: caret - dropped),
-  );
-});
 
 class _TextView extends StatefulWidget {
   const _TextView(this.ask, this.onChanged, this.onDone);
@@ -182,13 +170,9 @@ class _AmountViewState extends State<_AmountView> {
         _Question(widget.ask),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: TextField(
+          child: MoneyField(
             controller: controller,
             focusNode: focus,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            autocorrect: false,
-            enableSuggestions: false,
-            inputFormatters: [_decimal],
             textInputAction: TextInputAction.next,
             style: style,
             decoration: InputDecoration(
@@ -197,6 +181,10 @@ class _AmountViewState extends State<_AmountView> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
               hintText: '0',
+              helperStyle: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFeatures: tabular,
+              ),
               filled: false,
               border: const UnderlineInputBorder(),
               focusedBorder: UnderlineInputBorder(
@@ -206,8 +194,8 @@ class _AmountViewState extends State<_AmountView> {
                 ),
               ),
             ),
-            onChanged: (text) {
-              widget.ask.paise = parseHundredths(text);
+            onValue: (paise) {
+              widget.ask.paise = paise;
               widget.onChanged();
             },
             onEditingComplete: () {},
@@ -875,12 +863,9 @@ class _SplitViewState extends State<_SplitView> {
               const SizedBox(width: 12),
               SizedBox(
                 width: 110,
-                child: TextField(
+                child: MoneyField(
                   controller: _itemController(item, 'amount'),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [_decimal],
+                  showResult: false,
                   textAlign: TextAlign.end,
                   textInputAction: TextInputAction.done,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -894,8 +879,8 @@ class _SplitViewState extends State<_SplitView> {
                         ? hundredthsText(ask.left)
                         : '0',
                   ),
-                  onChanged: (text) {
-                    item.paise = parseHundredths(text);
+                  onValue: (paise) {
+                    item.paise = paise;
                     widget.onChanged();
                   },
                 ),
@@ -1013,12 +998,10 @@ class _SplitViewState extends State<_SplitView> {
           subtitle: percent ? shareText : null,
           trailing: SizedBox(
             width: 120,
-            child: TextField(
+            child: MoneyField(
               controller: _controller(id),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [_decimal],
+              showResult: false,
+              unit: percent ? '%' : '₹',
               textAlign: TextAlign.end,
               textInputAction: id == ask.people().last
                   ? TextInputAction.done
@@ -1035,7 +1018,7 @@ class _SplitViewState extends State<_SplitView> {
                 suffixIconConstraints: const BoxConstraints(),
                 hintText: ask.filler == id ? hundredthsText(ask.left) : '0',
               ),
-              onChanged: (text) => _setValue(id, parseHundredths(text)),
+              onValue: (value) => _setValue(id, value),
             ),
           ),
         );
