@@ -12,6 +12,7 @@ import 'backup.dart';
 import 'bill_screen.dart';
 import 'categories_screen.dart';
 import 'category_screen.dart';
+import 'export_screen.dart';
 import 'friend_screen.dart';
 import 'friends_screen.dart';
 import 'import_screen.dart';
@@ -97,6 +98,12 @@ final commands = [
     'Add expenses, payments and money in from a file',
     Icons.file_open_outlined,
     (store) => ImportScreen(store: store),
+  ),
+  Command.screen(
+    'export',
+    'Save your records to a file, for a spreadsheet or a backup',
+    Icons.ios_share,
+    (store) => ExportScreen(store: store),
   ),
 ];
 

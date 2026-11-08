@@ -25,6 +25,7 @@ Every action is a slash command. Tap a shortcut above the command bar, or type `
 | `/categories` | Opens the list of categories |
 | `/spending` | Opens monthly spending |
 | `/import` | Choose a file, check what it adds, then add it |
+| `/export` | Save your records to a file, as a spreadsheet or a Between file |
 | `/undo` | Reverts the last change |
 
 - Defaults: no category, group General, quantity 1, payer you, equal split (by quantity when there is more than one unit), and no expenses for a payment (it goes to the overall balance).
@@ -72,6 +73,15 @@ The file is a ledger in the same JSON format the app saves (see [Data](#data)), 
 - skips expenses, payments and money in whose id you already have, so importing a file twice adds nothing.
 - refuses a file whose records don't add up, such as exact parts that don't total the amount or a payment toward an expense not in the file, and says which record. Nothing is saved.
 
+## Exporting
+
+`/export` saves every record to a file you pick with the phone's save dialog (Android only for now). Nothing on the phone changes.
+
+- **Spreadsheet (CSV)** has one row per expense, payment and money in, oldest first, for Excel or Google Sheets. Its columns are Date, Type, Description, Category, Group, Amount, Paid by, Your share, Shared with (everyone in an expense and their share) and In your spending. Amounts are plain rupees like `1200.50`, so spreadsheets read them as numbers.
+- **Between file (JSON)** is the whole ledger in the format the app saves (see [Data](#data)), including friends, groups and categories. `/import` reads it back, on this phone or another, so it also works as a backup you keep yourself.
+
+Files are named by date, like `between-2026-11-08.csv`.
+
 ## Cloud backup
 
 Android only for now. After tapping **Back up to Google** on home and signing in:
@@ -107,6 +117,7 @@ lib/
     store.dart           Persistence (SQLite), undo, and upgrading old data
     cloud.dart           Syncing with a cloud copy: diffs, three-way merge, SyncedStorage
     import.dart          Adding records from a file, matched to yours by name
+    export.dart          Records as a CSV spreadsheet or a JSON file
   cloud/
     firestore_cloud.dart The ledger in Firestore, one document per record
     account.dart         Google sign-in, and keeping the ledger in step with Firestore
@@ -124,6 +135,7 @@ lib/
     categories_screen.dart  The list of categories
     category_screen.dart One category: its expenses, editing and deleting it
     import_screen.dart   Choosing a file to import and previewing it
+    export_screen.dart   Saving records to a CSV or JSON file
     backup.dart          The "Back up to Google" row and signing in
     widgets.dart         Shared rows, labels, and the undo snackbar
     money_field.dart     Money fields that take sums, and the + − × ÷ keys
