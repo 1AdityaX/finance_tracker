@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'ledger.dart';
 import 'store.dart';
 
@@ -21,6 +23,7 @@ class ImportPreview {
     required this.newCategories,
     required this.newBills,
     required this.skipped,
+    this.updated = const [],
     this.from,
     this.to,
   });
@@ -41,19 +44,28 @@ class ImportPreview {
   /// Records already in the ledger, as from importing the same file twice.
   final int skipped;
 
+  /// What each record the file changes is called, like "Spider-Man" or
+  /// "Payment from Rahul". Only records the file lists under `update` change.
+  final List<String> updated;
+
   /// The earliest and latest dates among the new records.
   final DateTime? from;
   final DateTime? to;
 
-  bool get isEmpty => expenses + payments + incomes == 0;
+  bool get isEmpty => expenses + payments + incomes + updated.length == 0;
 }
 
 /// Adds the records in [source], a ledger saved as JSON, to [current].
 ///
-/// Nothing in [current] is changed or removed. Friends, categories and bills
-/// are matched to the ones you have by name, ignoring case, so an import
-/// never makes a second "Aayush". Expenses, payments and money in already in
-/// [current], by id, are skipped, so the same file can be imported twice.
+/// Friends, categories and bills are matched to the ones you have by name,
+/// ignoring case, so an import never makes a second "Aayush". Expenses,
+/// payments and money in already in [current], by id, are skipped, so the
+/// same file can be imported twice.
+///
+/// Nothing in [current] is changed or removed, except records whose id the
+/// file lists under `update`: those replace the record with the same id in
+/// [current], keeping its place and any payments toward it. A listed record
+/// that [current] lacks is added; one that is already the same is skipped.
 ///
 /// Throws an [ImportError] if [source] isn't a ledger or doesn't add up.
 ImportPreview previewImport(Ledger current, String source) {
@@ -64,6 +76,7 @@ ImportPreview previewImport(Ledger current, String source) {
     throw const ImportError('This file isn’t a Between import file.');
   }
   _check(incoming);
+  final updates = _updateIds(source, incoming);
 
   String key(String name) => name.trim().toLowerCase();
   final takenIds = {
@@ -123,13 +136,39 @@ ImportPreview previewImport(Ledger current, String source) {
 
   final expenses = [...current.expenses];
   final known = {for (final e in current.expenses) e.id};
-  for (final e in incoming.expenses) {
-    if (!known.add(e.id)) {
-      skipped++;
-      continue;
+  final updated = <String>[];
+
+  /// Adds [record], or replaces the one with its id when the file lists it
+  /// under `update` and it differs.
+  void place<T>(
+    List<T> records,
+    Set<String> known,
+    T record,
+    String id,
+    DateTime date,
+    String label,
+    Map<String, Object?> Function(T) json,
+  ) {
+    if (known.add(id)) {
+      dates.add(date);
+      records.add(record);
+      return;
     }
-    dates.add(e.date);
-    expenses.add(
+    final index = records.indexWhere((r) => json(r)['id'] == id);
+    if (!updates.contains(id) ||
+        jsonEncode(json(records[index])) == jsonEncode(json(record))) {
+      skipped++;
+      return;
+    }
+    dates.add(date);
+    records[index] = record;
+    updated.add(label);
+  }
+
+  for (final e in incoming.expenses) {
+    place(
+      expenses,
+      known,
       Expense(
         id: e.id,
         billId: billIds[e.billId]!,
@@ -153,39 +192,49 @@ ImportPreview previewImport(Ledger current, String source) {
             ),
         ],
       ),
+      e.id,
+      e.date,
+      e.name,
+      (e) => e.toJson(),
     );
   }
 
   final payments = [...current.payments];
   final knownPayments = {for (final p in current.payments) p.id};
   for (final p in incoming.payments) {
-    if (!knownPayments.add(p.id)) {
-      skipped++;
-      continue;
-    }
-    dates.add(p.date);
-    payments.add(
+    final friend = friendIds[p.friendId]!;
+    place(
+      payments,
+      knownPayments,
       Payment(
         id: p.id,
-        friendId: friendIds[p.friendId]!,
+        friendId: friend,
         direction: p.direction,
         amount: p.amount,
         billId: billIds[p.billId]!,
         settles: p.settles,
         date: p.date,
       ),
+      p.id,
+      p.date,
+      '${p.direction == Direction.received ? 'Payment from' : 'Payment to'} '
+      '${friends.firstWhere((f) => f.id == friend).name}',
+      (p) => p.toJson(),
     );
   }
 
   final incomes = [...current.incomes];
   final knownIncomes = {for (final i in current.incomes) i.id};
   for (final i in incoming.incomes) {
-    if (!knownIncomes.add(i.id)) {
-      skipped++;
-      continue;
-    }
-    dates.add(i.date);
-    incomes.add(i);
+    place(
+      incomes,
+      knownIncomes,
+      i,
+      i.id,
+      i.date,
+      'Money in from ${i.from}',
+      (i) => i.toJson(),
+    );
   }
 
   final ledger = Ledger(
@@ -206,9 +255,33 @@ ImportPreview previewImport(Ledger current, String source) {
     newCategories: newCategories,
     newBills: newBills,
     skipped: skipped,
+    updated: updated,
     from: dates.firstOrNull,
     to: dates.lastOrNull,
   );
+}
+
+/// The ids [source] lists under `update`, each of which must be an expense,
+/// payment or money in that [incoming] contains.
+Set<String> _updateIds(String source, Ledger incoming) {
+  final list = switch ((jsonDecode(source) as Map)['update']) {
+    null => const <Object?>[],
+    final List<Object?> list => list,
+    _ => throw const ImportError('The file’s update list isn’t a list of ids.'),
+  };
+  final ids = {
+    for (final e in incoming.expenses) e.id,
+    for (final p in incoming.payments) p.id,
+    for (final i in incoming.incomes) i.id,
+  };
+  for (final id in list) {
+    if (id is! String || !ids.contains(id)) {
+      throw const ImportError(
+        'The file asks to update a record it doesn’t contain.',
+      );
+    }
+  }
+  return list.cast<String>().toSet();
 }
 
 /// Throws an [ImportError] naming the first record in [ledger] that points

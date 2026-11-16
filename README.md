@@ -68,10 +68,12 @@ A category can be excluded from spending by answering "No, leave it out" to "Cou
 
 The file is a ledger in the same JSON format the app saves (see [Data](#data)), at any supported version. Importing:
 
-- only adds; nothing you have is changed or removed.
+- only adds, unless the file lists records to update; nothing else you have is changed, and nothing is removed.
 - matches friends, categories and groups to yours by name, ignoring case, so it never makes a second friend with the same name.
 - skips expenses, payments and money in whose id you already have, so importing a file twice adds nothing.
 - refuses a file whose records don't add up, such as exact parts that don't total the amount or a payment toward an expense not in the file, and says which record. Nothing is saved.
+
+To correct records you already have, list their ids under `update` at the top level of the file, e.g. `"update": ["hdfc-0000621007371279"]`. Each listed expense, payment or money in replaces the one with the same id, keeping its place and the payments toward it, and the preview lists it under Updates. A listed record you don't have yet is added; one that is already the same is skipped. Undo takes the whole import back.
 
 ## Exporting
 

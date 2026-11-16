@@ -77,8 +77,9 @@ class _ImportScreenState extends State<ImportScreen> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: Text(
               'Add expenses, payments and money in from a Between import '
-              'file. Nothing you already have is changed, and importing the '
-              'same file again adds nothing new.',
+              'file. Nothing you already have is changed unless the file '
+              'lists it to update, and importing the same file again adds '
+              'nothing new.',
               style: muted,
             ),
           ),
@@ -120,13 +121,17 @@ class _ImportScreenState extends State<ImportScreen> {
       (final from?, final to?) => '${shortDate(from)} to ${shortDate(to)}',
       _ => null,
     };
+    final adds = preview.expenses + preview.payments + preview.incomes > 0;
     return [
-      const SectionHeader('This file adds'),
-      ListTile(
-        leading: const IconBadge(Icons.receipt_long_outlined),
-        title: Text(_count(preview)),
-        subtitle: range == null ? null : Text(range),
-      ),
+      SectionHeader(adds ? 'This file adds' : 'This file changes'),
+      if (adds)
+        ListTile(
+          leading: const IconBadge(Icons.receipt_long_outlined),
+          title: Text(_added(preview)),
+          subtitle: range == null ? null : Text(range),
+        ),
+      if (preview.updated.isNotEmpty)
+        _names(Icons.edit_outlined, 'Updates', preview.updated),
       if (preview.newFriends.isNotEmpty)
         _names(
           Icons.person_add_alt_1_outlined,
@@ -171,18 +176,29 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 }
 
+String _plural(int n, String one, String many) =>
+    n == 1 ? '1 $one' : '$n $many';
+
+/// ["132 expenses", "36 payments", "9 money in"].
+List<String> _addedParts(ImportPreview preview) => [
+  if (preview.expenses > 0) _plural(preview.expenses, 'expense', 'expenses'),
+  if (preview.payments > 0) _plural(preview.payments, 'payment', 'payments'),
+  if (preview.incomes > 0) '${preview.incomes} money in',
+];
+
 /// "132 expenses, 36 payments and 9 money in".
-String _count(ImportPreview preview) {
-  String plural(int n, String one, String many) =>
-      n == 1 ? '1 $one' : '$n $many';
-  final parts = [
-    if (preview.expenses > 0) plural(preview.expenses, 'expense', 'expenses'),
-    if (preview.payments > 0) plural(preview.payments, 'payment', 'payments'),
-    if (preview.incomes > 0) '${preview.incomes} money in',
-  ];
-  return switch (parts) {
-    [final only] => only,
-    [...final rest, final last] => '${rest.join(', ')} and $last',
-    _ => 'nothing',
-  };
-}
+String _added(ImportPreview preview) => _list(_addedParts(preview));
+
+/// What [preview] adds and updates: "2 expenses, 1 payment and 1 update".
+String _count(ImportPreview preview) => _list([
+  ..._addedParts(preview),
+  if (preview.updated.isNotEmpty)
+    _plural(preview.updated.length, 'update', 'updates'),
+]);
+
+/// "a, b and c".
+String _list(List<String> parts) => switch (parts) {
+  [final only] => only,
+  [...final rest, final last] => '${rest.join(', ')} and $last',
+  _ => 'nothing',
+};

@@ -88,6 +88,98 @@ void main() {
       expect(twice.ledger.expenses, hasLength(1));
     });
 
+    group('update', () {
+      /// [source] with `update` listing [ids].
+      String updating(String source, List<String> ids) => jsonEncode({
+        ...(jsonDecode(source) as Map<String, Object?>),
+        'update': ids,
+      });
+
+      /// The ledger after importing [file], with Rahul paying ₹100 toward
+      /// its expense x1.
+      Ledger imported() {
+        final ledger = previewImport(ledgerWith(), file()).ledger;
+        return ledger.put(
+          payment: payment(id: 'y1', expenseId: 'x1', amount: 10000),
+        );
+      }
+
+      /// x1 shared by you and Kavya only, ₹450 each.
+      final changed = file(
+        expenses: [
+          expense(
+            id: 'x1',
+            billId: 'trip',
+            split: SplitMode.exact,
+            amount: 90000,
+            parts: {me: 45000, 'kavya': 45000},
+            categoryId: 'food',
+          ),
+        ],
+      );
+
+      test('replaces a listed record in place, keeping its payments', () {
+        final before = imported();
+        final preview = previewImport(before, updating(changed, ['x1']));
+        expect(preview.updated, ['Dinner']);
+        expect(preview.expenses, 0);
+        expect(preview.isEmpty, isFalse);
+        final kavya = preview.ledger.friends.singleWhere(
+          (f) => f.name == 'Kavya',
+        );
+        final rahul = preview.ledger.friends.singleWhere(
+          (f) => f.name == 'Rahul',
+        );
+        expect(preview.ledger.expenses.map((e) => e.id), ['x1']);
+        expect(preview.ledger.expense('x1')!.parts, {
+          me: 45000,
+          kavya.id: 45000,
+        });
+        expect(preview.ledger.payment('y1')!.settles, {'x1': 10000});
+        expect(preview.ledger.balance(rahul.id), -10000);
+        expect(preview.ledger.balance(kavya.id), 45000);
+      });
+
+      test('importing the same update again changes nothing', () {
+        final once = previewImport(imported(), updating(changed, ['x1']));
+        final twice = previewImport(once.ledger, updating(changed, ['x1']));
+        expect(twice.isEmpty, isTrue);
+        expect(twice.skipped, 1);
+      });
+
+      test('a record not listed is still skipped', () {
+        final preview = previewImport(imported(), changed);
+        expect(preview.isEmpty, isTrue);
+        expect(preview.ledger.expense('x1')!.parts, hasLength(3));
+      });
+
+      test('a listed record that is new is added', () {
+        final preview = previewImport(ledgerWith(), updating(file(), ['x1']));
+        expect(preview.expenses, 1);
+        expect(preview.updated, isEmpty);
+      });
+
+      test('refuses an update list naming a record not in the file', () {
+        expect(
+          () => previewImport(ledgerWith(), updating(file(), ['nope'])),
+          throwsA(
+            isA<ImportError>().having(
+              (e) => e.message,
+              'message',
+              'The file asks to update a record it doesn’t contain.',
+            ),
+          ),
+        );
+        expect(
+          () => previewImport(
+            ledgerWith(),
+            jsonEncode({...(jsonDecode(file()) as Map), 'update': 'x1'}),
+          ),
+          throwsA(isA<ImportError>()),
+        );
+      });
+    });
+
     test('keeps a new record’s id unless it is taken', () {
       final ledger = previewImport(
         Ledger.empty.put(
@@ -233,6 +325,37 @@ void main() {
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
       expect(store.ledger.expenses, isEmpty);
+    });
+
+    testWidgets('shows what a file updates, then updates it', (tester) async {
+      final store = await open(
+        tester,
+        () async => jsonEncode({
+          ...(jsonDecode(
+                file(
+                  expenses: [
+                    expense(
+                      id: 'x1',
+                      name: 'Dinner',
+                      parts: {me: 1, 'kavya': 1},
+                    ),
+                  ],
+                ),
+              )
+              as Map<String, Object?>),
+          'update': ['x1'],
+        }),
+      );
+      await store.save(previewImport(store.ledger, file()).ledger, 'import');
+      await tester.tap(find.text('Choose file'));
+      await tester.pumpAndSettle();
+      expect(find.text('This file changes'), findsOneWidget);
+      expect(find.text('Updates (1)'), findsOneWidget);
+
+      await tester.tap(find.text('Add to my records'));
+      await tester.pumpAndSettle();
+      expect(find.text('Imported 1 update'), findsOneWidget);
+      expect(store.ledger.expense('x1')!.split, SplitMode.equal);
     });
 
     testWidgets('says why a file can’t be imported', (tester) async {
